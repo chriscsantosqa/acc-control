@@ -32,7 +32,7 @@ jobs:
 
       - name: Compile backend
         run: |
-          python -m py_compile app.py coc/*.py tools/import_coc_assets.py tests/test_contract_refactor.py
+          python -m py_compile app.py coc/*.py tools/import_coc_assets.py tests/test_contract_refactor.py tests/test_local_login.py
 
       - name: Run regression suite
         env:
@@ -45,3 +45,4 @@ jobs:
           python tests/test_sync_all.py
           python tests/test_multiuser.py
           python tests/test_contract_refactor.py
+          python tests/test_local_login.py
