@@ -1,4 +1,5 @@
 flask>=3.0
+python-dotenv>=1.0     # carrega .env automaticamente no uso local/VPS
 pyperclip>=1.8         # watcher de clipboard
 # --- automação opcional do Google Play Games Beta ---
 pyautogui>=0.9.54
