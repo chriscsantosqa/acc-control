@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT,
     access_until INTEGER,
     checked_at INTEGER,
+    suspended_at INTEGER,
+    suspension_reason TEXT,
     api_key_hash TEXT UNIQUE,
     api_key_hint TEXT,
     created_at INTEGER NOT NULL,
@@ -71,6 +73,15 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     fails INTEGER NOT NULL DEFAULT 0,
     locked_until INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS access_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    event TEXT NOT NULL,
+    source TEXT NOT NULL,
+    detail TEXT DEFAULT '',
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_access_audit_user ON access_audit(user_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS notified (
     key TEXT PRIMARY KEY,
     sent_at INTEGER NOT NULL
@@ -90,6 +101,30 @@ CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
 """
 
 _ready = set()
+COC_CONTROL_CLASH_LABS_REFACTOR_2026_09 = True
+
+
+def _migration_required(con):
+    tables = {r["name"] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if not tables:
+        return False
+    if "accounts" in tables and "user_id" not in _cols(con, "accounts"):
+        return True
+    if "users" not in tables:
+        return True
+    return not {"suspended_at", "suspension_reason"}.issubset(_cols(con, "users")) or "access_audit" not in tables
+
+
+def _backup_before_migration(con):
+    if DB_PATH == ":memory:" or not os.path.isfile(DB_PATH) or not _migration_required(con):
+        return None
+    dest = f"{DB_PATH}.pre-migration-{time.strftime('%Y%m%d-%H%M%S')}.bak"
+    out = sqlite3.connect(dest)
+    try:
+        con.backup(out)
+    finally:
+        out.close()
+    return dest
 
 
 def connect():
@@ -97,6 +132,7 @@ def connect():
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
     if DB_PATH not in _ready:
+        _backup_before_migration(con)
         con.executescript(SCHEMA)
         _migrate(con)
         con.executescript(POST_MIGRATION)
@@ -144,6 +180,12 @@ def _owner_in_tx(con):
 
 
 def _migrate(con):
+    user_cols = _cols(con, "users")
+    if "suspended_at" not in user_cols:
+        con.execute("ALTER TABLE users ADD COLUMN suspended_at INTEGER")
+    if "suspension_reason" not in user_cols:
+        con.execute("ALTER TABLE users ADD COLUMN suspension_reason TEXT")
+
     if "user_id" not in _cols(con, "accounts"):
         def rebuild():
             cols = _cols(con, "accounts")
@@ -181,6 +223,13 @@ def _migrate(con):
                 con.execute("DELETE FROM settings WHERE key='api_key'")
             con.execute("INSERT INTO settings(key, value) VALUES('schema_multiuser', '1')")
         _locked(con, move_settings)
+
+
+# ------------------------------------------------------------ auditoria de acesso
+def audit_access(con, user_id, event, source, detail=""):
+    con.execute("INSERT INTO access_audit(user_id,event,source,detail,created_at) VALUES(?,?,?,?,?)",
+                (user_id, event, source, str(detail or "")[:1000], int(time.time())))
+    con.commit()
 
 
 # ------------------------------------------------------------ usuários
@@ -225,9 +274,13 @@ def upsert_labs_user(con, labs_user_id, email, name):
 
 
 def set_access(con, user_id, access_until, checked_at=None):
+    before = get_user(con, user_id)
     con.execute("UPDATE users SET access_until=?, checked_at=? WHERE id=?",
                 (access_until, checked_at or int(time.time()), user_id))
     con.commit()
+    if before and before.get("access_until") != access_until:
+        audit_access(con, user_id, "entitlement-updated", "clash-labs",
+                     json.dumps({"before": before.get("access_until"), "after": access_until}))
 
 
 def touch_login(con, user_id):
@@ -270,10 +323,56 @@ def subscribers_due(con, now, stale_s=6 * 3600, soon_s=86400, min_gap_s=3600, li
 
 def list_subscribers(con):
     rows = con.execute(
-        "SELECT u.id, u.email, u.name, u.access_until, u.checked_at, u.created_at, u.last_login_at, "
-        "(SELECT COUNT(*) FROM accounts a WHERE a.user_id = u.id) AS villages "
+        "SELECT u.id,u.email,u.name,u.access_until,u.checked_at,u.suspended_at,u.suspension_reason,u.created_at,u.last_login_at, "
+        "(SELECT COUNT(*) FROM accounts a WHERE a.user_id=u.id) AS villages "
         "FROM users u WHERE u.role='subscriber' ORDER BY u.created_at DESC")
     return [dict(r) for r in rows]
+
+
+def set_user_suspension(con, user_id, suspended, reason=""):
+    user = get_user(con, user_id)
+    if not user or user["role"] != "subscriber":
+        return None
+    con.execute("UPDATE users SET suspended_at=?, suspension_reason=? WHERE id=?",
+                (int(time.time()) if suspended else None, (str(reason or "").strip()[:500] if suspended else None), user_id))
+    con.commit()
+    audit_access(con, user_id, "manual-suspended" if suspended else "manual-reactivated", "owner", reason)
+    return get_user(con, user_id)
+
+
+def _json_or_text(value):
+    try:
+        return json.loads(value)
+    except Exception:
+        return value
+
+
+def export_user_data(con, user_id):
+    user = get_user(con, user_id)
+    if not user:
+        return None
+    safe = {k: user.get(k) for k in ("id","role","labs_user_id","email","name","access_until","checked_at","suspended_at","suspension_reason","created_at","last_login_at","api_key_hint")}
+    settings = {r["key"]: _json_or_text(r["value"]) for r in con.execute("SELECT key,value FROM user_settings WHERE user_id=?", (user_id,))}
+    accounts = []
+    for acc in list_accounts(con, user_id):
+        item = dict(acc)
+        item["snapshots"] = []
+        for row in con.execute("SELECT id,taken_at,imported_at,th_level,raw_json,parsed_json FROM snapshots WHERE account_id=? ORDER BY taken_at,id", (acc["id"],)):
+            snap = dict(row); snap["raw_json"] = _json_or_text(snap["raw_json"]); snap["parsed_json"] = _json_or_text(snap["parsed_json"]); item["snapshots"].append(snap)
+        item["player_stats"] = []
+        for row in con.execute("SELECT id,fetched_at,json FROM player_stats WHERE account_id=? ORDER BY fetched_at,id", (acc["id"],)):
+            ps = dict(row); ps["json"] = _json_or_text(ps["json"]); item["player_stats"].append(ps)
+        accounts.append(item)
+    audit = [dict(r) for r in con.execute("SELECT event,source,detail,created_at FROM access_audit WHERE user_id=? ORDER BY id", (user_id,))]
+    return {"user": safe, "settings": settings, "accounts": accounts, "access_audit": audit}
+
+
+def delete_subscriber_data(con, user_id):
+    user = get_user(con, user_id)
+    if not user or user["role"] != "subscriber":
+        return False
+    audit_access(con, user_id, "data-deleted", "self-service", "LGPD")
+    con.execute("DELETE FROM users WHERE id=?", (user_id,)); con.commit(); return True
 
 
 # ------------------------------------------------------------ vilas (sempre de um usuário)

@@ -205,12 +205,12 @@ check(cb.patch(f"/api/accounts/{aid}", json={"name": "hackeada"}, headers=H(csrf
 check(cb.post(f"/api/accounts/{aid}/sync-supercell", headers=H(csrf_b)).status_code == 404, "B não sincroniza a vila de A")
 check(cb.post(f"/api/accounts/{aid}/verify", json={"token": "x"}, headers=H(csrf_b)).status_code == 404, "B não verifica a vila de A")
 sid = ca.get(f"/api/accounts/{aid}/detail").json["summary"]["snapshot_id"]
-cb.delete(f"/api/snapshots/{sid}", headers=H(csrf_b))
-cb.delete(f"/api/accounts/{aid}", headers=H(csrf_b))
+check(cb.delete(f"/api/snapshots/{sid}", headers=H(csrf_b)).status_code == 404, "snapshot de outro usuário responde 404")
+check(cb.delete(f"/api/accounts/{aid}", headers=H(csrf_b)).status_code == 404, "vila de outro usuário responde 404")
 d = ca.get(f"/api/accounts/{aid}/detail").json
 check(d["account"]["name"] != "hackeada" and d["summary"]["snapshot_id"] == sid, "exclusões de B não alcançam os dados de A")
 r = cb.post(f"/api/import?account_id={aid}", data=raw, content_type="application/json", headers=H(csrf_b))
-check(r.json["account"]["id"] == bid, "import apontando para a vila de A cai na vila de B")
+check(r.status_code == 404, "import com id de vila de outro usuário responde 404")
 check(len(ca.get(f"/api/accounts/{aid}/detail").json["history"]) == 1, "vila de A continua com 1 snapshot")
 check(ca.post("/api/import", data=raw, content_type="application/json").status_code == 403, "sessão sem X-CSRF é bloqueada")
 

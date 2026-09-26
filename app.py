@@ -61,7 +61,8 @@ if os.environ.get("COC_BEHIND_PROXY") == "1":
 PUBLIC_PATHS = {"/api/health", "/api/login", "/login",
                 "/entrar/clash-labs", "/api/labs/callback", "/api/labs/webhook", "/api/labs/info"}
 # com o passe vencido o assinante ainda abre a página, vê quem é, acha onde renovar e sai
-LAPSED_OK = {"/", "/api/me", "/api/status", "/api/logout"}
+LAPSED_OK = {"/", "/api/me", "/api/status", "/api/logout", "/api/me/export", "/api/me/data"}
+# COC_CONTROL_CLASH_LABS_REFACTOR_2026_09
 MUTATING = ("POST", "PUT", "PATCH", "DELETE")
 
 
@@ -240,6 +241,8 @@ def labs_webhook():
         labs.refresh_labs_user(con, body.get("userId"))
     except ValueError as e:
         return jsonify({"error": str(e)}), 422
+    except labs.LabsError:
+        return jsonify({"error": "não foi possível confirmar a alteração de acesso"}), 502
     finally:
         con.close()
     return jsonify({"ok": True})
@@ -254,10 +257,38 @@ def me():
         "email": u.get("email") if u["role"] == "subscriber" else None,
         "access_until": u.get("access_until"),
         "active": labs.has_access(u),
+        "suspended": bool(u.get("suspended_at")),
+        "suspension_reason": u.get("suspension_reason"),
         "api_key_hint": u.get("api_key_hint"),
         "limits": None if u["role"] == "owner" else {"accounts": MAX_ACCOUNTS, "snapshots": MAX_SNAPSHOTS},
         "labs": {"enabled": labs.enabled(), "store": labs.store_url(), "account": labs.account_url()},
     })
+
+
+@app.get("/api/me/export")
+def me_export():
+    con = db.connect()
+    try:
+        payload = db.export_user_data(con, uid())
+    finally:
+        con.close()
+    if payload is None:
+        return jsonify({"error": "conta não encontrada"}), 404
+    resp = jsonify(payload); resp.headers["Content-Disposition"] = 'attachment; filename="coc-control-meus-dados.json"'; return resp
+
+
+@app.delete("/api/me/data")
+def me_delete_data():
+    if is_owner():
+        return jsonify({"error": "a conta do dono não pode ser excluída por esta rota"}), 403
+    con = db.connect()
+    try:
+        ok = db.delete_subscriber_data(con, uid())
+    finally:
+        con.close()
+    if not ok:
+        return jsonify({"error": "conta não encontrada"}), 404
+    session.clear(); resp = jsonify({"ok": True}); resp.delete_cookie("csrf"); return resp
 
 
 @app.post("/api/apikey")
@@ -280,6 +311,25 @@ def admin_subscribers():
         return jsonify(db.list_subscribers(con))
     finally:
         con.close()
+
+
+@app.post("/api/admin/subscribers/<int:user_id>/suspension")
+def admin_subscriber_suspension(user_id):
+    if not is_owner():
+        return jsonify({"error": "só o dono pode alterar o acesso de assinantes"}), 403
+    body = request.get_json(force=True, silent=True) or {}; reason = body.get("reason") or ""
+    if not isinstance(reason, str) or len(reason) > 500:
+        return jsonify({"error": "motivo inválido"}), 422
+    if reason.strip().lower().startswith("clash-labs:"):
+        return jsonify({"error": "o prefixo clash-labs: é reservado para sincronização"}), 422
+    con = db.connect()
+    try:
+        user = db.set_user_suspension(con, user_id, bool(body.get("suspended")), reason)
+    finally:
+        con.close()
+    if not user:
+        return jsonify({"error": "assinante não encontrado"}), 404
+    return jsonify({"id": user["id"], "suspended": bool(user.get("suspended_at")), "suspended_at": user.get("suspended_at"), "suspension_reason": user.get("suspension_reason")})
 
 
 # ------------------------------------------------------------------ watcher
@@ -502,7 +552,9 @@ def import_export(text, user_id, source="manual", account_id=None):
         account = None
         if account_id is not None:
             account = db.get_account(con, user_id, account_id)
-            if account and parsed["tag"] and not account.get("tag"):
+            if account is None:
+                raise Refused(404, "conta não encontrada")
+            if parsed["tag"] and not account.get("tag"):
                 account = db.update_account(con, user_id, account["id"], tag=parsed["tag"])
         if account is None and parsed["tag"]:
             account = db.get_account_by_tag(con, user_id, parsed["tag"])
@@ -670,8 +722,7 @@ def accounts_update(account_id):
 def accounts_delete(account_id):
     con = db.connect()
     try:
-        db.delete_account(con, uid(), account_id)
-        return jsonify({"ok": True})
+        _owned(con, account_id); db.delete_account(con, uid(), account_id); return jsonify({"ok": True})
     finally:
         con.close()
 
@@ -722,8 +773,10 @@ def account_detail(account_id):
 def snapshot_delete(snapshot_id):
     con = db.connect()
     try:
-        db.delete_snapshot(con, uid(), snapshot_id)
-        return jsonify({"ok": True})
+        snap = db.get_snapshot(con, snapshot_id)
+        if not snap or not db.get_account(con, uid(), snap["account_id"]):
+            raise Refused(404, "snapshot não encontrado")
+        db.delete_snapshot(con, uid(), snapshot_id); return jsonify({"ok": True})
     finally:
         con.close()
 
