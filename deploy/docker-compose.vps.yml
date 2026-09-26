@@ -1,0 +1,33 @@
+# COC Control na VPS — projeto compose SEPARADO do automation-stack.
+# Sobe na rede externa do Caddy (automation_proxy) sem expor porta no host.
+# Uso (a partir de /opt/coc-control):
+#   docker compose --project-directory . -f deploy/docker-compose.vps.yml up -d --build
+name: coc-control
+
+services:
+  coc-control:
+    build:
+      context: .
+    container_name: coc-control
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8420"
+    volumes:
+      - coc_control_data:/data
+    networks:
+      - proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 384m
+
+volumes:
+  coc_control_data:
+
+networks:
+  proxy:
+    external: true
+    name: ${COC_PROXY_NET:-automation_proxy}

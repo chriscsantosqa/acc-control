@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COC Control</title>
+<style>
+:root{
+  --bg:#0b1220; --bg2:#0f1729; --card:#131e33; --card2:#182741; --line:#22334f;
+  --tx:#e7eefc; --tx2:#8fa3c4; --tx3:#5f7396;
+  --acc:#4da3ff; --ok:#3ddc84; --warn:#ffb020; --err:#ff5d5d;
+  --gold:#f7c948; --elixir:#e05ce0; --dark:#a78bfa; --ore:#7dd3fc;
+  --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);color:var(--tx);
+  font:14px/1.45 'Segoe UI',system-ui,sans-serif;min-height:100vh}
+a{color:var(--acc)}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px}
+/* topbar */
+.topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 0;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.logo{font-size:20px;font-weight:700;letter-spacing:.4px}
+.logo span{color:var(--acc)}
+.logo small{display:block;font-size:11px;color:var(--tx3);font-weight:400}
+.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--card2);border:1px solid var(--line);color:var(--tx);padding:8px 14px;
+  border-radius:9px;cursor:pointer;font-size:13px;transition:.15s}
+.btn:hover{border-color:var(--acc);background:#1d3050}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#06101f;font-weight:600}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.danger{color:var(--err)}
+.btn.sm{padding:4px 10px;font-size:12px}
+/* watcher switch */
+.watcher{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);
+  padding:6px 12px;border-radius:9px;font-size:12px;color:var(--tx2)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--tx3)}
+.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.off{background:var(--err)}
+.switch{position:relative;width:34px;height:18px;background:var(--line);border-radius:10px;cursor:pointer;transition:.2s}
+.switch.on{background:var(--ok)}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:.2s}
+.switch.on::after{left:18px}
+/* cards / grid */
+.grid{display:grid;gap:14px}
+.grid.accounts{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card.click{cursor:pointer;transition:.15s}
+.card.click:hover{border-color:var(--acc);transform:translateY(-2px)}
+.acc-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.th-badge{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#2a3f63,#16233c);
+  border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.th-badge b{font-size:16px}
+.th-badge small{font-size:9px;color:var(--tx2)}
+.acc-name{font-weight:600;font-size:15px;overflow-wrap:anywhere}
+.stat .val{overflow-wrap:anywhere}
+.acc-tag{font-size:12px;color:var(--tx3);font-family:Consolas,monospace}
+.acc-actions{margin-left:auto;display:flex;gap:4px}
+.iconbtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:14px;padding:4px;border-radius:6px}
+.iconbtn:hover{color:var(--tx);background:var(--card2)}
+.progress{height:8px;background:#0d1626;border-radius:5px;overflow:hidden;margin:6px 0}
+.progress > div{height:100%;background:linear-gradient(90deg,#2f80ed,#56ccf2);border-radius:5px;transition:width .4s}
+.progress.green > div{background:linear-gradient(90deg,#11998e,#38ef7d)}
+.kv{display:flex;justify-content:space-between;font-size:12.5px;color:var(--tx2);padding:2px 0}
+.kv b{color:var(--tx);font-weight:600}
+.muted{color:var(--tx3);font-size:12px}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;background:var(--card2);border:1px solid var(--line);color:var(--tx2);margin:1px 2px 1px 0}
+.pill.gold{color:var(--gold)} .pill.elixir{color:var(--elixir)} .pill.dark{color:var(--dark)} .pill.ore{color:var(--ore)}
+.pill.sc{color:#ffd166;border-color:#8a6d1a}
+/* section titles */
+h2.sec{font-size:15px;color:var(--tx2);margin:22px 0 10px;display:flex;align-items:center;gap:8px}
+h2.sec::after{content:'';flex:1;height:1px;background:var(--line)}
+/* stats row */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat .lbl{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px}
+.stat .val{font-size:19px;font-weight:700;margin-top:3px}
+.stat .sub{font-size:11.5px;color:var(--tx2);margin-top:2px}
+/* categorias */
+.grid.cats{grid-template-columns:repeat(auto-fill,minmax(215px,1fr))}
+.cat .top{display:flex;justify-content:space-between;align-items:baseline}
+.cat .top b{font-size:16px}
+.cat .name{font-size:13px;color:var(--tx2)}
+/* tabela */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--tx3);text-align:left;font-weight:600;font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid #1a2740;vertical-align:top}
+tr:hover td{background:#16223a}
+.num{text-align:right;white-space:nowrap}
+/* upgrades ativos */
+.up-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #1a2740}
+.up-item:last-child{border:none}
+.queue-tag{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.4px}
+.queue-builder{background:#3d2f10;color:var(--gold)}
+.queue-lab{background:#2a1638;color:var(--elixir)}
+.queue-pet{background:#12303a;color:var(--ore)}
+.countdown{margin-left:auto;text-align:right}
+.countdown b{font-variant-numeric:tabular-nums}
+.countdown small{display:block;color:var(--tx3)}
+/* toast */
+#toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:99}
+.toast{background:var(--card2);border:1px solid var(--acc);border-radius:10px;padding:12px 16px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);animation:slide .25s;max-width:340px;font-size:13px}
+.toast.err{border-color:var(--err)}
+@keyframes slide{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(4,8,16,.72);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(560px,92vw);max-height:88vh;overflow:auto}
+.modal h3{margin-bottom:12px;font-size:16px}
+.modal label{display:block;font-size:12px;color:var(--tx2);margin:10px 0 4px}
+.modal input,.modal textarea,.modal select{width:100%;background:#0d1626;border:1px solid var(--line);
+  border-radius:8px;color:var(--tx);padding:9px 11px;font:inherit}
+.modal textarea{min-height:150px;font-family:Consolas,monospace;font-size:12px}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.banner{border-radius:10px;padding:10px 14px;font-size:12.5px;margin:10px 0;border:1px solid}
+.banner.warn{background:#2a2210;border-color:#6b5516;color:#ffd166}
+.banner.info{background:#102336;border-color:#1c4566;color:#8fd0ff}
+.empty{text-align:center;color:var(--tx3);padding:60px 20px}
+.empty .big{font-size:40px;margin-bottom:10px}
+.back{background:none;border:none;color:var(--acc);cursor:pointer;font-size:13px;padding:0;margin-bottom:10px}
+svg text{font-family:inherit}
+.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+@media(max-width:640px){.wrap{padding:10px}.grid.accounts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="logo">COC <span>Control</span><small id="gd-info">carregando…</small></div>
+    <div class="top-actions">
+      <div class="watcher" id="w-box" title="Detecta automaticamente o export copiado no jogo">
+        <div class="dot" id="w-dot"></div> <span id="w-label">Watcher clipboard</span>
+        <div class="switch" id="w-switch" onclick="toggleWatcher()"></div>
+      </div>
+      <button class="btn" onclick="importClipboard()">📋 Importar do clipboard</button>
+      <button class="btn" onclick="openModal('m-paste')">Colar JSON</button>
+      <button class="btn primary" onclick="openModal('m-new')">+ Nova conta</button>
+      <button class="btn" onclick="openSettings()" title="Alertas, WhatsApp e API Supercell">⚙️</button>
+      <button class="btn" id="btn-logout" style="display:none" title="Sair" onclick="logout()">🚪</button>
+    </div>
+  </div>
+  <div id="view"></div>
+</div>
+
+<div id="toasts"></div>
+
+<div class="modal-bg" id="m-new">
+  <div class="modal">
+    <h3>Nova conta</h3>
+    <label>Nome da conta *</label>
+    <input id="new-name" placeholder="ex.: Main TH18">
+    <label>Tag do jogador (opcional — preenchida automaticamente no 1º import)</label>
+    <input id="new-tag" placeholder="#PJ9UURQYU">
+    <label>Notas</label>
+    <input id="new-notes" placeholder="opcional">
+    <div class="row">
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn primary" onclick="createAccount()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-paste">
+  <div class="modal">
+    <h3>Importar export da vila (JSON)</h3>
+    <div class="banner info">No jogo: ⚙️ Configurações → Mais configurações → Exportação de dados → <b>Copiar</b>. Depois cole aqui (Ctrl+V).</div>
+    <label>JSON do export</label>
+    <textarea id="paste-json" placeholder='{"tag":"#...","timestamp":...,"buildings":[...]}'></textarea>
+    <label>Atribuir à conta (opcional — por padrão identifica pela tag)</label>
+    <select id="paste-account"><option value="">— identificar pela tag —</option></select>
+    <div class="row">
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn primary" onclick="importPasted()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-edit">
+  <div class="modal">
+    <h3>Editar conta</h3>
+    <input type="hidden" id="edit-id">
+    <label>Nome</label><input id="edit-name">
+    <label>Tag</label><input id="edit-tag">
+    <label>Notas</label><input id="edit-notes">
+    <label>Verificação de posse — Token de API do jogo (⚙️ do jogo → Mais configurações → Token de API → Mostrar)</label>
+    <div style="display:flex;gap:8px">
+      <input id="edit-gametoken" placeholder="cole o token do jogo (muda a cada uso)" style="flex:1">
+      <button class="btn" onclick="verifyAccount()">✅ Verificar</button>
+    </div>
+    <div class="row">
+      <button class="btn danger" onclick="deleteAccount()">Excluir conta</button>
+      <span class="spacer"></span>
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn primary" onclick="saveAccount()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-raw">
+  <div class="modal" style="width:min(760px,94vw)">
+    <h3>Resposta da API Supercell (bruta)</h3>
+    <pre id="raw-json" style="background:#0d1626;border:1px solid var(--line);border-radius:8px;padding:12px;max-height:60vh;overflow:auto;font-size:11.5px"></pre>
+    <div class="row"><button class="btn" onclick="closeModals()">Fechar</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-settings">
+  <div class="modal">
+    <h3>Configurações</h3>
+    <div id="st-account" style="display:none">
+      <h4 style="color:var(--tx2);font-size:13px;margin:8px 0 2px">👤 Sua conta</h4>
+      <div id="st-account-body" class="banner info" style="margin:6px 0"></div>
+    </div>
+    <h4 style="color:var(--tx2);font-size:13px;margin:8px 0 2px">🔔 Alertas de término</h4>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <input type="checkbox" id="st-notify" style="width:auto"> Ativar alertas (upgrade concluído / construtor livre)</label>
+    <label style="display:flex;gap:8px;align-items:center" class="owner-only">
+      <input type="checkbox" id="st-toast" style="width:auto"> Notificação do Windows (toast)</label>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1"><label>Avisar X min antes (0 = desliga)</label><input id="st-lead" type="number" min="0"></div>
+      <div style="flex:1"><label>Resumo diário às (HH:MM, vazio = desliga)</label><input id="st-digest" placeholder="08:00"></div>
+    </div>
+    <label>Telegram — token do bot (@BotFather)</label><input id="st-tg-token" placeholder="123456:ABC...">
+    <label>Telegram — chat_id</label><input id="st-tg-chat" placeholder="ex.: 123456789">
+    <label>Discord — webhook URL</label><input id="st-discord" placeholder="https://discord.com/api/webhooks/...">
+    <h4 style="color:var(--tx2);font-size:13px;margin:14px 0 2px">📱 WhatsApp (Evolution API)</h4>
+    <div style="display:flex;gap:10px">
+      <div style="flex:2"><label>URL do servidor (só a base, sem /message/...)</label><input id="st-ev-url" placeholder="https://evolution.seudominio.com"></div>
+      <div style="flex:1"><label>Instância</label><input id="st-ev-inst" placeholder="principal"></div>
+    </div>
+    <label>apikey da instância</label><input id="st-ev-key" placeholder="apikey da instância">
+    <label>Destino — número (5511999999999) ou JID de grupo (...@g.us)</label>
+    <input id="st-ev-num" placeholder="5511999999999 ou 120363...@g.us">
+    <h4 style="color:var(--tx2);font-size:13px;margin:14px 0 2px">🛡 API oficial Supercell</h4>
+    <div class="owner-only">
+      <label>Token (crie grátis em developer.clashofclans.com — vinculado ao seu IP)</label>
+      <input id="st-sc-token" placeholder="eyJ0eXAiOiJKV1Qi...">
+    </div>
+    <div class="subscriber-only muted" id="st-sc-info" style="margin-top:6px"></div>
+    <label style="display:flex;gap:8px;align-items:center">
+      <input type="checkbox" id="st-sc-auto" style="width:auto"> Sincronizar troféus/clã automaticamente a cada import</label>
+    <h4 style="color:var(--tx2);font-size:13px;margin:14px 0 2px">📊 Estado dos alertas</h4>
+    <div id="st-nstatus" class="banner info" style="margin:6px 0">carregando…</div>
+    <h4 style="color:var(--tx2);font-size:13px;margin:14px 0 2px">🔑 API key do COC Control</h4>
+    <label>Use como <code>Authorization: Bearer &lt;key&gt;</code> na automação (--api-key) e integrações. A chave aparece só quando é gerada: guarde-a.</label>
+    <div style="display:flex;gap:8px">
+      <input id="st-apikey" readonly style="flex:1;color:var(--tx2)">
+      <button class="btn" type="button" id="st-apikey-copy" style="display:none" onclick="navigator.clipboard.writeText($('#st-apikey').value);toast('API key copiada ✔')">copiar</button>
+      <button class="btn" type="button" onclick="newApiKey()">gerar nova</button>
+    </div>
+    <div id="st-subs" style="display:none">
+      <h4 style="color:var(--tx2);font-size:13px;margin:14px 0 2px">🎟 Assinantes da Clash Labs</h4>
+      <div id="st-subs-body" class="card" style="padding:4px 8px;overflow-x:auto;margin-top:6px"></div>
+    </div>
+    <div class="row">
+      <button class="btn" onclick="testNotify()">🔔 Testar notificação</button>
+      <span class="spacer"></span>
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+      <button class="btn primary" onclick="saveSettings()">Salvar</button>
+    </div>
+  </div>
+</div>
+<script>
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+/* tudo que vem do usuário, do export ou da Supercell passa por aqui antes de virar HTML */
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function csrf(){ const m=document.cookie.match(/(?:^|; )csrf=([^;]+)/); return m?decodeURIComponent(m[1]):''; }
+async function API(p){
+  const r = await fetch('/api'+p);
+  if(r.status===401){ location.href='/login'; throw new Error('não autenticado'); }
+  if(r.status===402){ const j = await r.json().catch(()=>({})); renderLapsed(j); throw new Error(j.error||'passe inativo'); }
+  return r.json();
+}
+let accounts = [], currentView = {page:'home'}, lastEventSeq = 0, watcherState = {}, gdVersion = '';
+let ME = {role:'owner', labs:{}};
+const isOwner = () => ME.role === 'owner';
+
+const RES_LABEL = {'Gold':'Ouro','Elixir':'Elixir','Dark Elixir':'Elixir Negro','Gold or Elixir':'Ouro/Elixir','Ore':'Minério'};
+const RES_CLASS = {'Gold':'gold','Elixir':'elixir','Dark Elixir':'dark','Gold or Elixir':'gold','Ore':'ore'};
+const ORE_LABEL = {shiny:'Brilhante',glowing:'Reluzente',starry:'Estelar'};
+
+function fmtNum(n){
+  if(n==null) return '—';
+  if(n>=1e9) return (n/1e9).toFixed(2).replace('.',',')+'B';
+  if(n>=1e6) return (n/1e6).toFixed(1).replace('.',',')+'M';
+  if(n>=1e3) return (n/1e3).toFixed(0)+'k';
+  return String(n);
+}
+function fmtDur(secs){
+  if(secs==null||secs<=0) return '0m';
+  const d=Math.floor(secs/86400), h=Math.floor(secs%86400/3600), m=Math.floor(secs%3600/60);
+  if(d>0) return `${d}d ${h}h`;
+  if(h>0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+function fmtDate(ts){
+  if(!ts) return '—';
+  return new Date(ts*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function fmtAgo(ts){
+  const s = Math.floor(Date.now()/1000 - ts);
+  if(s<90) return 'agora há pouco';
+  if(s<5400) return `${Math.round(s/60)} min atrás`;
+  if(s<172800) return `${Math.round(s/3600)} h atrás`;
+  return `${Math.round(s/86400)} dias atrás`;
+}
+function costPills(cost, ores){
+  let h = Object.entries(cost||{}).filter(([,v])=>v>0)
+    .map(([res,v])=>`<span class="pill ${RES_CLASS[res]||''}">${fmtNum(v)} ${RES_LABEL[res]||res}</span>`).join('');
+  if(ores) h += Object.entries(ores).filter(([,v])=>v>0)
+    .map(([k,v])=>`<span class="pill ore">${fmtNum(v)} ${ORE_LABEL[k]||k}</span>`).join('');
+  return h || '<span class="muted">—</span>';
+}
+function toast(msg, err=false){
+  const el = document.createElement('div');
+  el.className = 'toast'+(err?' err':''); el.innerHTML = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(()=>el.remove(), 6000);
+}
+function openModal(id){
+  if(id==='m-paste'){
+    const sel = $('#paste-account');
+    sel.innerHTML = '<option value="">— identificar pela tag —</option>' +
+      accounts.map(a=>`<option value="${a.id}">${esc(a.name)} ${esc(a.tag||'')}</option>`).join('');
+  }
+  $('#'+id).classList.add('open');
+}
+function closeModals(){ document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open')); }
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals();}));
+
+/* ============ API actions ============ */
+async function post(path, body, method='POST'){
+  const r = await fetch('/api'+path, {method, headers:{'Content-Type':'application/json','X-CSRF':csrf()}, body: body?JSON.stringify(body):undefined});
+  if(r.status===401){ location.href='/login'; throw new Error('não autenticado'); }
+  const j = await r.json().catch(()=>({}));
+  if(r.status===402){ renderLapsed(j); }
+  if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+async function logout(){
+  try{ await post('/logout',{}); }catch(e){}
+  location.href='/login';
+}
+async function createAccount(){
+  try{
+    const acc = await post('/accounts', {name:$('#new-name').value.trim(), tag:$('#new-tag').value.trim(), notes:$('#new-notes').value.trim()});
+    closeModals(); toast(acc.synced?`Conta criada e sincronizada ✔ (${esc(acc.name)})`:'Conta criada ✔'); refresh();
+  }catch(e){ toast('Erro: '+esc(e.message), true); }
+}
+let detailAccount = null;
+function openEditById(id){
+  const a = accounts.find(x=>x.id===id) || (detailAccount && detailAccount.id===id ? detailAccount : null);
+  if(a) openEdit(a);
+}
+function openEdit(a){
+  $('#edit-id').value=a.id; $('#edit-name').value=a.name; $('#edit-tag').value=a.tag||''; $('#edit-notes').value=a.notes||'';
+  openModal('m-edit');
+}
+async function saveAccount(){
+  try{
+    await post('/accounts/'+$('#edit-id').value, {name:$('#edit-name').value.trim(), tag:$('#edit-tag').value.trim(), notes:$('#edit-notes').value.trim()}, 'PATCH');
+    closeModals(); toast('Conta atualizada ✔'); refresh();
+  }catch(e){ toast('Erro: '+esc(e.message), true); }
+}
+async function deleteAccount(){
+  if(!confirm('Excluir a conta e todo o histórico de snapshots?')) return;
+  await post('/accounts/'+$('#edit-id').value, null, 'DELETE');
+  closeModals(); toast('Conta excluída'); currentView={page:'home'}; refresh();
+}
+async function importText(text, accountId){
+  const q = accountId ? '?account_id='+accountId : '';
+  const r = await fetch('/api/import'+q, {method:'POST', headers:{'Content-Type':'application/json','X-CSRF':csrf()}, body:text});
+  if(r.status===401){ location.href='/login'; throw new Error('não autenticado'); }
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+async function importClipboard(){
+  try{
+    const text = await navigator.clipboard.readText();
+    if(!text || !text.trim().startsWith('{')) return toast('Clipboard não contém um JSON. Copie o export no jogo primeiro.', true);
+    const j = await importText(text);
+    toast(`Vila <b>${esc(j.tag)}</b> (TH${esc(j.th_level)}) importada para <b>${esc(j.account.name)}</b> ✔`);
+    refresh();
+  }catch(e){ toast('Import falhou: '+esc(e.message), true); }
+}
+async function importPasted(){
+  try{
+    const j = await importText($('#paste-json').value, $('#paste-account').value||null);
+    closeModals(); $('#paste-json').value='';
+    toast(`Vila <b>${esc(j.tag||'')}</b> (TH${esc(j.th_level)}) importada para <b>${esc(j.account.name)}</b> ✔`);
+    refresh();
+  }catch(e){ toast('Import falhou: '+esc(e.message), true); }
+}
+async function deleteSnapshot(id){
+  if(!confirm('Excluir este snapshot?')) return;
+  await post('/snapshots/'+id, null, 'DELETE');
+  toast('Snapshot excluído'); refresh();
+}
+/* watcher do navegador: usado quando o SERVIDOR não tem clipboard (VPS).
+   A página lê o clipboard do SEU PC (com permissão) enquanto a aba está em foco. */
+const bw = {enabled: localStorage.getItem('bw')==='1', last: '', busy: false};
+async function toggleWatcher(){
+  if(watcherState.available){
+    const j = await post('/watcher', {enabled: !watcherState.enabled});
+    watcherState = {...watcherState, ...j};
+    renderWatcher();
+    return;
+  }
+  // modo navegador
+  if(!bw.enabled){
+    if(!navigator.clipboard || !navigator.clipboard.readText)
+      return toast('Este navegador não permite leitura do clipboard (requer HTTPS).', true);
+    try{ await navigator.clipboard.readText(); }   // gesto do usuário → pede permissão
+    catch(e){ return toast('Permita o acesso à área de transferência para ativar o watcher.', true); }
+    bw.enabled = true; localStorage.setItem('bw','1');
+    toast('Watcher do navegador ativo: copie o export no jogo e volte para esta aba ✔');
+  }else{
+    bw.enabled = false; localStorage.setItem('bw','0');
+  }
+  renderWatcher();
+}
+async function browserWatchTick(){
+  if(!bw.enabled || bw.busy || watcherState.available) return;
+  if(!document.hasFocus()) return;
+  let text = '';
+  try{ text = await navigator.clipboard.readText(); }catch(e){ return; }
+  if(!text || text.length<80 || text.length>4000000) return;
+  const t = text.trim();
+  if(!t.startsWith('{') || !t.includes('"tag"') || !(t.includes('"buildings"')||t.includes('"heroes"'))) return;
+  const h = t.length + ':' + t.slice(0,40) + t.slice(-24);
+  if(h === bw.last) return;
+  bw.last = h;
+  bw.busy = true;
+  try{
+    const j = await importText(t);
+    toast(`📋 Watcher: vila <b>${esc(j.tag)}</b> (TH${esc(j.th_level)}) importada em <b>${esc(j.account.name)}</b> ✔`);
+    refresh();
+  }catch(e){ toast('Watcher: '+esc(e.message), true); }
+  bw.busy = false;
+}
+function renderWatcher(){
+  const srv = watcherState.available;
+  $('#w-label').textContent = srv ? 'Watcher clipboard' : 'Watcher (navegador)';
+  $('#w-box').title = srv ? 'Detecta automaticamente o export copiado no jogo'
+    : 'Servidor remoto sem clipboard — a própria página detecta o export copiado no seu PC enquanto esta aba estiver em foco';
+  const on = srv ? !!watcherState.enabled : bw.enabled;
+  $('#w-switch').classList.toggle('on', on);
+  $('#w-dot').className = 'dot '+(on?'on':'off');
+}
+
+/* ============ views ============ */
+function accountCard(a){
+  const l = a.latest;
+  if(!l) return `
+    <div class="card click" onclick="goDetail(${a.id})">
+      <div class="acc-head">
+        <div class="th-badge"><b>?</b><small>TH</small></div>
+        <div><div class="acc-name">${esc(a.name)}</div><div class="acc-tag">${esc(a.tag||'sem tag')}</div></div>
+        <div class="acc-actions"><button class="iconbtn" title="Editar" onclick="event.stopPropagation();openEditById(${a.id})">✏️</button></div>
+      </div>
+      <div class="muted">Nenhum snapshot ainda — importe o export desta vila.</div>
+    </div>`;
+  const nf = l.next_finish;
+  return `
+  <div class="card click" onclick="goDetail(${a.id})">
+    <div class="acc-head">
+      <div class="th-badge"><b>${l.th_level}</b><small>TH</small></div>
+      <div><div class="acc-name">${esc(a.name)} ${a.verified?'<span title="posse verificada via Token de API do jogo">✅</span>':''}</div><div class="acc-tag">${esc(a.tag||'')}</div></div>
+      <div class="acc-actions"><button class="iconbtn" title="Editar" onclick="event.stopPropagation();openEditById(${a.id})">✏️</button></div>
+    </div>
+    <div class="kv"><span>Progresso da vila</span><b>${l.progress_total}%</b></div>
+    <div class="progress ${l.progress_total>=95?'green':''}"><div style="width:${l.progress_total}%"></div></div>
+    <div class="kv"><span>Upgrades pendentes</span><b>${l.pending_total}</b></div>
+    <div class="kv"><span>Construtores</span><b>${l.builders.busy}/${l.builders.total} ocupados</b></div>
+    <div class="kv"><span>ETA construtores</span><b>${fmtDur(l.eta.builder_secs)}</b></div>
+    ${nf?`<div class="kv"><span>Próximo término</span><b>${esc(nf.name)} → ${fmtDate(nf.finish_ts)}</b></div>`:''}
+    <div class="kv"><span>Custo restante</span><span>${costPills(l.cost_left)}</span></div>
+    ${a.player?`<div class="kv"><span>🏆 ${esc(a.player.trophies)} · ${esc(a.player.league||'')}</span><span class="muted">${esc(a.player.clan?a.player.clan.name:'')}</span></div>`:''}
+    <div class="muted" style="margin-top:6px">Snapshot: ${fmtAgo(l.taken_at)} · ${a.snapshots} no histórico</div>
+  </div>`;
+}
+
+function renderHome(){
+  const v = $('#view');
+  if(!accounts.length){
+    v.innerHTML = `<div class="empty"><div class="big">🏰</div>
+      <p><b>Nenhuma conta ainda.</b></p>
+      <p style="margin:8px 0 16px">Copie o export no jogo (⚙️ → Mais configurações → Exportação de dados → Copiar)<br>
+      e clique em <b>Importar do clipboard</b> — a conta é criada automaticamente pela tag.<br>
+      Com o <b>watcher ligado</b>, basta copiar no jogo que o import acontece sozinho.</p>
+      <button class="btn primary" onclick="importClipboard()">📋 Importar do clipboard</button></div>`;
+    return;
+  }
+  const totalPend = accounts.reduce((s,a)=>s+(a.latest?.pending_total||0),0);
+  const busy = accounts.reduce((s,a)=>s+(a.latest?.builders.busy||0),0);
+  const tot  = accounts.reduce((s,a)=>s+(a.latest?.builders.total||0),0);
+  v.innerHTML = `
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat"><div class="lbl">Contas</div><div class="val">${accounts.length}</div></div>
+      <div class="stat"><div class="lbl">Construtores ocupados</div><div class="val">${busy}/${tot}</div></div>
+      <div class="stat"><div class="lbl">Upgrades pendentes (todas)</div><div class="val">${totalPend}</div></div>
+      <div class="stat"><div class="lbl">Próximo término</div><div class="val" style="font-size:14px">${nextAcrossAccounts()}</div></div>
+    </div>
+    <div class="flex" style="margin-bottom:10px">
+      <span class="muted">Ordenar por:</span>
+      <select id="acc-sort" onchange="setSort(this.value)" style="background:#0d1626;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 10px">
+        <option value="name">Nome (A–Z)</option>
+        <option value="th">Centro de Vila (maior)</option>
+        <option value="up">Mais upada</option>
+        <option value="down">Menos upada</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="btn sm" id="btn-syncall" onclick="syncAll()">↻ Sincronizar todas</button>
+    </div>
+    <div class="grid accounts">${sortAccounts(accounts).map(accountCard).join('')}</div>`;
+  $('#acc-sort').value = localStorage.getItem('accSort')||'name';
+}
+function sortAccounts(list){
+  const mode = localStorage.getItem('accSort')||'name';
+  const p = a => a.latest ? a.latest.progress_total : -1;
+  const t = a => a.latest ? a.latest.th_level : -1;
+  const noSnapLast = (a,b) => (p(a)===-1) - (p(b)===-1);
+  const arr = [...list];
+  if(mode==='th')       arr.sort((a,b)=> noSnapLast(a,b) || t(b)-t(a) || p(b)-p(a));
+  else if(mode==='up')  arr.sort((a,b)=> noSnapLast(a,b) || p(b)-p(a));
+  else if(mode==='down')arr.sort((a,b)=> noSnapLast(a,b) || p(a)-p(b));
+  else                  arr.sort((a,b)=> a.name.localeCompare(b.name,'pt-BR'));
+  return arr;
+}
+function setSort(v){ localStorage.setItem('accSort', v); renderHome(); }
+async function syncAll(){
+  const btn = $('#btn-syncall');
+  btn.disabled = true; btn.textContent = '↻ sincronizando…';
+  try{
+    const r = await post('/sync-all', {});
+    const errs = r.results.filter(x=>!x.ok);
+    toast(`↻ ${r.synced}/${r.total} contas sincronizadas ✔` +
+      (errs.length?`<br><small>${errs.map(e=>`${esc(e.name)}: ${esc(e.error)}`).join('<br>')}</small>`:''), errs.length>0 && r.synced===0);
+    refresh();
+  }catch(e){ toast('Sync falhou: '+esc(e.message), true); }
+  btn.disabled = false; btn.textContent = '↻ Sincronizar todas';
+}
+function nextAcrossAccounts(){
+  let best=null, who='';
+  accounts.forEach(a=>{
+    const nf=a.latest?.next_finish;
+    if(nf && (!best || nf.finish_ts<best.finish_ts)){best=nf;who=a.name;}
+  });
+  return best ? `${esc(best.name)} (${esc(who)})<br><small class="muted">${fmtDate(best.finish_ts)}</small>` : '—';
+}
+
+/* ============ detalhe da conta ============ */
+async function goDetail(id){
+  currentView = {page:'detail', id};
+  const d = await API(`/accounts/${id}/detail`);
+  renderDetail(d);
+}
+function catCard(cat, c){
+  const done = c.progress>=100;
+  return `
+  <div class="card cat">
+    <div class="top"><span class="name">${c.label}</span><b style="color:${done?'var(--ok)':'var(--tx)'}">${c.progress}%</b></div>
+    <div class="progress ${done?'green':''}"><div style="width:${Math.min(100,c.progress)}%"></div></div>
+    <div class="kv"><span>${c.pending_levels} upgrades pendentes</span><span>${c.secs?fmtDur(c.secs):''}</span></div>
+    <div>${costPills(c.cost)}${c.supercharged?`<span class="pill sc">⚡ ${c.supercharged} supercharged</span>`:''}</div>
+    ${c.partial?`<div class="muted">⚠ ${c.partial} níveis sem custo/tempo na base</div>`:''}
+  </div>`;
+}
+function lineChart(series){
+  if(series.length<2) return '<div class="muted">O gráfico de evolução aparece a partir do 2º snapshot.</div>';
+  const W=920,H=200,P=34;
+  const xs=series.map(s=>s.taken_at), ys=series.map(s=>s.progress);
+  const x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.max(0,Math.min(...ys)-2), y1=Math.min(100,Math.max(...ys)+1);
+  const X=t=>P+(W-2*P)*(x1===x0?0.5:(t-x0)/(x1-x0));
+  const Y=v=>H-P-(H-2*P)*(y1===y0?0.5:(v-y0)/(y1-y0));
+  const pts=series.map(s=>`${X(s.taken_at).toFixed(1)},${Y(s.progress).toFixed(1)}`).join(' ');
+  const grid=[0,.25,.5,.75,1].map(f=>{
+    const v=y0+(y1-y0)*f, y=Y(v);
+    return `<line x1="${P}" y1="${y}" x2="${W-P}" y2="${y}" stroke="#22334f" stroke-dasharray="3 4"/>
+            <text x="${P-6}" y="${y+4}" fill="#5f7396" font-size="10" text-anchor="end">${v.toFixed(1)}%</text>`;
+  }).join('');
+  const dots=series.map(s=>`<circle cx="${X(s.taken_at)}" cy="${Y(s.progress)}" r="3.5" fill="#4da3ff">
+      <title>${fmtDate(s.taken_at)} — ${s.progress}% (TH${s.th})</title></circle>`).join('');
+  const labels=[series[0],series[series.length-1]].map(s=>
+    `<text x="${X(s.taken_at)}" y="${H-8}" fill="#5f7396" font-size="10" text-anchor="middle">${fmtDate(s.taken_at)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    ${grid}<polyline points="${pts}" fill="none" stroke="#4da3ff" stroke-width="2.2"/>${dots}${labels}</svg>`;
+}
+function renderDetail(d){
+  const v=$('#view'), a=d.account, s=d.summary;
+  detailAccount = a;
+  if(!s){
+    v.innerHTML=`<button class="back" onclick="goHome()">← voltar</button>
+      <div class="empty"><div class="big">📭</div><p><b>${esc(a.name)}</b> ainda não tem snapshots.</p>
+      <p class="muted" style="margin:8px 0 16px">Importe o export desta vila (a tag ${esc(a.tag||'')} será associada automaticamente).</p>
+      <button class="btn primary" onclick="importClipboard()">📋 Importar do clipboard</button></div>`;
+    return;
+  }
+  const e=s.eta, b=s.builders;
+  const warnKey = `warn:${a.id}:${s.data_warnings?.clamped_items||0}`;
+  const warn = (s.data_warnings?.clamped_items && !localStorage.getItem(warnKey)) ? `
+    <div class="banner warn" style="display:flex;gap:10px;align-items:flex-start">
+      <div>⚠ <b>${s.data_warnings.clamped_items} itens</b> acima do máximo conhecido pela base
+      (${esc(gdVersion||'?')}) — ex.: ${esc(s.data_warnings.clamped_names.slice(0,4).join(', '))}.
+      O jogo recebeu update mais recente que o pacote da comunidade; esses itens aparecem como 100%
+      e voltam ao normal quando o pacote npm atualizar (README → Base de dados).</div>
+      <button class="iconbtn" title="dispensar este aviso" style="margin-left:auto"
+        onclick="localStorage.setItem('${warnKey}','1');goDetail(${a.id})">✕</button>
+    </div>`:'';
+  const unk = (s.unknown_ids?.length && isOwner()) ? `
+    <div class="banner info">ℹ ${s.unknown_ids.length} IDs desconhecidos no export: ${esc(s.unknown_ids.join(', '))} —
+    adicione em <b>data/overrides.json</b> para nomeá-los.</div>`:'';
+  v.innerHTML = `
+    <button class="back" onclick="goHome()">← voltar</button>
+    <div class="flex" style="margin-bottom:6px">
+      <div class="th-badge" style="width:52px;height:52px"><b style="font-size:19px">${s.th_level}</b><small>TH</small></div>
+      <div>
+        <div style="font-size:19px;font-weight:700">${esc(a.name)} ${a.verified?'<span style="font-size:14px" title="posse verificada via Token de API do jogo">✅</span>':''}</div>
+        <div class="acc-tag">${esc(a.tag||'')} · snapshot ${fmtAgo(s.taken_at)} (${fmtDate(s.taken_at)})</div>
+        <div class="muted" style="margin-top:3px">${d.player?
+          `🏆 ${esc(d.player.trophies)} · ${esc(d.player.league||'')} ${d.player.clan?'· '+esc(d.player.clan.name):''} · ⭐ ${esc(d.player.warStars||0)} estrelas de guerra · 🤝 ${esc(d.player.donations||0)} doações <button class="btn sm" onclick="syncSupercell(${a.id})">↻</button> <button class="btn sm" title="ver resposta completa da API" onclick="showRaw(${a.id})">{ }</button>`:
+          `<button class="btn sm" onclick="syncSupercell(${a.id})" title="requer token nas Configurações ⚙️">↻ Sincronizar Supercell (troféus/clã)</button>`}</div>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn sm" onclick="openEditById(${a.id})">✏️ Editar</button>
+      <button class="btn sm danger" onclick="deleteSnapshot(${s.snapshot_id})">🗑 Excluir snapshot</button>
+    </div>
+    ${warn}${unk}
+    <div class="stats">
+      <div class="stat"><div class="lbl">Progresso da vila</div><div class="val">${s.progress_total}%</div>
+        <div class="sub">${s.pending_total} upgrades pendentes</div></div>
+      <div class="stat"><div class="lbl">Construtores</div><div class="val">${b.busy}/${b.total}</div>
+        <div class="sub">${b.available>0?b.available+' livres':'próximo livre: '+fmtDate(b.next_free_ts)}</div></div>
+      <div class="stat"><div class="lbl">ETA construtores</div><div class="val">${fmtDur(e.builder_secs)}</div>
+        <div class="sub">tempo total ÷ ${b.total} builders</div></div>
+      <div class="stat"><div class="lbl">ETA laboratório</div><div class="val">${fmtDur(e.lab_secs)}</div>
+        <div class="sub">${s.lab_busy?'pesquisando agora':'fila sequencial'}</div></div>
+      <div class="stat"><div class="lbl">ETA pets</div><div class="val">${fmtDur(e.pet_secs)}</div><div class="sub">Casa dos Pets</div></div>
+      <div class="stat"><div class="lbl">Caminho crítico</div><div class="val">${fmtDur(e.critical_secs)}</div>
+        <div class="sub">término estimado: ${fmtDate(Math.floor(Date.now()/1000)+e.critical_secs)}</div></div>
+      ${d.velocity?`<div class="stat"><div class="lbl">Velocidade real</div>
+        <div class="val" style="color:${d.velocity.pct_per_day>0?'var(--ok)':'var(--tx)'}">${d.velocity.pct_per_day>0?'+':''}${d.velocity.pct_per_day}%/dia</div>
+        <div class="sub">${d.velocity.days_to_max?`100% em ~${Math.round(d.velocity.days_to_max)}d (${fmtDate(d.velocity.max_at_ts)})`:`janela de ${d.velocity.window_days}d`}</div></div>`:''}
+    </div>
+    <h2 class="sec">Custo restante</h2>
+    <div class="card"><div class="flex">
+      ${costPills(s.cost_left)}
+      ${Object.values(s.ores_needed||{}).some(v=>v>0)?'<span class="muted">· Equipamentos:</span>'+costPills({}, s.ores_needed):''}
+      ${s.next_th?`<span class="spacer"></span><span class="muted">Próximo CV ${s.next_th.to_lvl}:</span>
+        <span class="pill ${RES_CLASS[s.next_th.res]||''}">${fmtNum(s.next_th.cost)} ${RES_LABEL[s.next_th.res]||''}</span>
+        <span class="pill">${fmtDur(s.next_th.secs)}</span>`:''}
+    </div></div>
+    ${s.active_upgrades.length?`
+    <h2 class="sec">Upgrades em andamento (${s.active_upgrades.length})</h2>
+    <div class="card">
+      ${s.active_upgrades.map(u=>`
+        <div class="up-item">
+          <span class="queue-tag queue-${u.queue}">${u.queue==='builder'?'CONSTRUTOR':u.queue==='lab'?'LAB':'PET'}</span>
+          <span><b>${u.name}</b> <span class="muted">${u.from_lvl} → ${u.to_lvl}</span></span>
+          <span class="countdown"><b>${fmtDur(Math.max(0,u.finish_ts-Date.now()/1000))}</b>
+          <small>termina ${fmtDate(u.finish_ts)}</small></span>
+        </div>`).join('')}
+    </div>`:''}
+    <h2 class="sec">Progresso por categoria</h2>
+    <div class="grid cats">
+      ${Object.entries(s.categories).sort((x,y)=>x[1].progress-y[1].progress).map(([k,c])=>catCard(k,c)).join('')}
+    </div>
+    ${d.diff&&d.diff.changes?diffSection(d.diff):''}
+    <h2 class="sec">Planner de upgrades</h2>
+    <div class="card" id="planner-box"><div class="muted">carregando planner…</div></div>
+    ${s.missing_buildings.length?`
+    <h2 class="sec">Possivelmente ainda não construídos (estimativa)</h2>
+    <div class="card"><div class="flex">${s.missing_buildings.map(m=>`<span class="pill">${m.name} ×${m.missing}</span>`).join('')}
+    <span class="muted">— estimado pela quantidade esperada no TH${s.th_level}; mesclagens são consideradas.</span></div></div>`:''}
+    <h2 class="sec">Top upgrades pendentes</h2>
+    <div class="card" style="padding:4px 8px;overflow-x:auto">
+      <table>
+        <thead><tr><th>Item</th><th>Categoria</th><th class="num">Itens</th><th>Níveis</th><th>Custo</th><th class="num">Tempo total</th></tr></thead>
+        <tbody>
+        ${s.top_pending.map(t=>`
+          <tr><td><b>${t.name}</b>${t.partial?' <span title="níveis sem custo/tempo na base">⚠</span>':''}</td>
+          <td class="muted">${(s.categories[t.category]||{}).label||t.category}</td>
+          <td class="num">${t.items}</td>
+          <td class="muted">${t.breakdown}</td>
+          <td>${costPills(t.cost,t.ores)}</td>
+          <td class="num">${t.secs?fmtDur(t.secs):'—'}</td></tr>`).join('')}
+        ${!s.top_pending.length?'<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">Nada pendente — vila no máximo para o TH atual 🎉</td></tr>':''}
+        </tbody>
+      </table>
+    </div>
+    <h2 class="sec">Evolução do progresso</h2>
+    <div class="card">${lineChart(d.series)}</div>
+    <h2 class="sec">Histórico de snapshots (${d.history.length})</h2>
+    <div class="card" style="padding:4px 8px">
+      <table>
+        <thead><tr><th>Data do export</th><th>Importado</th><th class="num">TH</th><th></th></tr></thead>
+        <tbody>${d.history.map(h=>`
+          <tr><td>${fmtDate(h.taken_at)}</td><td class="muted">${fmtDate(h.imported_at)}</td>
+          <td class="num">${h.th_level||''}</td>
+          <td class="num"><button class="btn sm danger" onclick="deleteSnapshot(${h.id})">excluir</button></td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+// dispara o planner async depois que o detalhe renderiza
+const _renderDetail0 = renderDetail;
+renderDetail = function(d){ _renderDetail0(d); if(d.summary) loadPlan(d.account.id); };
+
+function goHome(){ currentView={page:'home'}; renderHome(); }
+
+/* ============ diff ============ */
+const KIND_ICON = {built:'🏗', upgraded:'⬆️', started:'▶️'};
+function diffSection(df){
+  const t = df.totals;
+  const spent = Object.keys(df.spent_estimate||{}).length ?
+    `<span class="muted">gasto estimado:</span> ${costPills(df.spent_estimate)}` : '';
+  const head = `<h2 class="sec">O que mudou desde o import anterior (${df.days}d)</h2>`;
+  if(!df.changes.length)
+    return head+`<div class="card"><span class="muted">Nenhuma mudança entre os dois últimos snapshots.</span></div>`;
+  return head+`<div class="card">
+    <div class="flex" style="margin-bottom:8px">
+      <span class="pill">⬆️ ${t.upgraded_levels} níveis concluídos</span>
+      <span class="pill">🏗 ${t.built} construídos</span>
+      <span class="pill">▶️ ${t.started} iniciados</span>
+      <span class="spacer"></span>${spent}
+    </div>
+    ${df.changes.slice(0,40).map(c=>`<div class="up-item">
+      <span>${KIND_ICON[c.kind]||''}</span><span><b>${esc(c.name)}</b> <span class="muted">${esc(c.text)}</span></span>
+    </div>`).join('')}
+    ${df.changes.length>40?`<div class="muted" style="padding:6px">… e mais ${df.changes.length-40} mudanças</div>`:''}
+  </div>`;
+}
+
+/* ============ planner ============ */
+let currentStrategy = 'balanced';
+const CAT_COLOR = {defense:'#e05c5c',trap:'#ff9f43',resource:'#f7c948',army:'#56ccf2',
+                   hero:'#a78bfa',troop:'#e05ce0',spell:'#b06ee0',siege:'#3ddc84',pet:'#7dd3fc',other:'#8fa3c4'};
+async function loadPlan(aid, strategy){
+  if(strategy) currentStrategy = strategy;
+  const box = $('#planner-box'); if(!box) return;
+  try{
+    const p = await API(`/accounts/${aid}/plan?strategy=${currentStrategy}`);
+    box.innerHTML = planHTML(aid, p);
+  }catch(e){ box.innerHTML = '<span class="muted">planner indisponível</span>'; }
+}
+function planHTML(aid, p){
+  const sel = `<select onchange="loadPlan(${aid}, this.value)" style="background:#0d1626;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 10px">
+    ${Object.entries(p.strategies).map(([k,l])=>`<option value="${k}" ${k===p.strategy?'selected':''}>${l}</option>`).join('')}</select>`;
+  const sug = p.suggestions.length ? p.suggestions.map(sg=>`
+    <div class="up-item">
+      <span class="queue-tag queue-builder">B${sg.worker}</span>
+      <span><b>${sg.name}</b> <span class="muted">→ lv ${sg.to_lvl}</span>
+        ${sg.when==='agora'?'<span class="pill" style="color:var(--ok)">disponível agora</span>':`<span class="muted">a partir de ${fmtDate(sg.start)}</span>`}</span>
+      <span class="countdown"><b>${fmtDur(sg.secs)}</b><small>${fmtNum(sg.cost)} ${RES_LABEL[sg.res]||sg.res||''}</small></span>
+    </div>`).join('') : '<div class="muted" style="padding:8px 0">Nada pendente nas filas de construtor 🎉</div>';
+  const labN = p.next_lab ? `<div class="up-item"><span class="queue-tag queue-lab">LAB</span>
+      <span><b>${p.next_lab.name}</b> <span class="muted">→ lv ${p.next_lab.to_lvl}</span></span>
+      <span class="countdown"><b>${fmtDur(p.next_lab.secs)}</b><small>${fmtNum(p.next_lab.cost)} ${RES_LABEL[p.next_lab.res]||''}</small></span></div>` : '';
+  return `
+    <div class="flex" style="margin-bottom:10px"><b>Próximos upgrades sugeridos</b><span class="spacer"></span>
+      <span class="muted">estratégia:</span> ${sel}</div>
+    ${sug}${labN}
+    <div class="flex" style="margin:10px 0 4px">
+      <span class="pill">🔨 construtores prontos: <b>&nbsp;${fmtDate(p.builders.done_at)}</b></span>
+      <span class="pill">🧪 lab pronto: <b>&nbsp;${fmtDate(p.lab.done_at)}</b></span>
+      <span class="pill">🐾 pets prontos: <b>&nbsp;${fmtDate(p.pets.done_at)}</b></span>
+    </div>
+    ${gantt(p)}
+    <div class="muted" style="margin-top:6px">${p.note}${p.builders.not_scheduled?` · ${p.builders.not_scheduled} upgrades além do horizonte exibido.`:''}</div>`;
+}
+function gantt(p){
+  const rows = [];
+  const byWorker = {};
+  p.builders.schedule.forEach(x=>{(byWorker[x.worker]=byWorker[x.worker]||[]).push(x);});
+  Object.keys(byWorker).sort((a,b)=>a-b).forEach(w=>rows.push({label:'B'+w, items:byWorker[w]}));
+  if(p.lab.schedule.length) rows.push({label:'LAB', items:p.lab.schedule});
+  if(p.pets.schedule.length) rows.push({label:'PET', items:p.pets.schedule});
+  if(!rows.length) return '';
+  const now = Math.floor(Date.now()/1000);
+  const end = Math.min(p.projected_all_done, now + 86400*180);
+  if(end<=now) return '';
+  const W=920, LP=44, RH=24, H=rows.length*RH+30;
+  const X=t=>LP+(W-LP-8)*Math.max(0,Math.min(1,(t-now)/(end-now)));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:6px">`;
+  // linhas de mes
+  for(let t=now; t<=end; t+=86400*30){
+    svg += `<line x1="${X(t)}" y1="14" x2="${X(t)}" y2="${H-14}" stroke="#22334f" stroke-dasharray="2 4"/>
+            <text x="${X(t)+2}" y="11" fill="#5f7396" font-size="9">${new Date(t*1000).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</text>`;
+  }
+  rows.forEach((r,i)=>{
+    const y = 18+i*RH;
+    svg += `<text x="2" y="${y+13}" fill="#8fa3c4" font-size="11" font-weight="600">${r.label}</text>`;
+    r.items.slice(0,80).forEach(it=>{
+      if(it.start>end) return;
+      const x1=X(it.start), x2=X(Math.min(it.end,end));
+      svg += `<rect x="${x1}" y="${y}" width="${Math.max(2,x2-x1)}" height="${RH-6}" rx="3"
+        fill="${CAT_COLOR[it.category]||'#8fa3c4'}" opacity="0.85">
+        <title>${it.name} → lv ${it.to_lvl}
+${fmtDate(it.start)} até ${fmtDate(it.end)} (${fmtDur(it.secs)})</title></rect>`;
+    });
+  });
+  svg += '</svg>';
+  const legend = [...new Set([].concat(p.builders.schedule,p.lab.schedule,p.pets.schedule).map(x=>x.category))]
+    .map(c=>`<span class="pill" style="color:${CAT_COLOR[c]||'#8fa3c4'}">■ ${c}</span>`).join('');
+  return svg+`<div class="flex" style="margin-top:4px">${legend}</div>`;
+}
+
+/* ============ settings & supercell ============ */
+function fmtDay(ts){ return ts ? new Date(ts*1000).toLocaleDateString('pt-BR') : '—'; }
+function applyRole(){
+  document.querySelectorAll('.owner-only').forEach(el=>el.style.display = isOwner() ? '' : 'none');
+  document.querySelectorAll('.subscriber-only').forEach(el=>el.style.display = isOwner() ? 'none' : '');
+}
+async function openSettings(){
+  const st = await API('/settings');
+  ME = await API('/me').catch(()=>ME);
+  applyRole();
+  $('#st-notify').checked = !!st.notify_enabled;
+  $('#st-toast').checked = !!st.toast_enabled;
+  $('#st-lead').value = st.lead_minutes||0;
+  $('#st-digest').value = st.digest_time||'';
+  $('#st-tg-token').value = st.telegram_token||'';
+  $('#st-tg-chat').value = st.telegram_chat_id||'';
+  $('#st-discord').value = st.discord_webhook||'';
+  $('#st-sc-token').value = st.supercell_token||'';
+  $('#st-sc-info').textContent = st.supercell_configured
+    ? 'Troféus, liga e clã vêm da API oficial da Supercell, pela chave do servidor.'
+    : 'A sincronização com a Supercell ainda não está disponível neste servidor.';
+  $('#st-sc-auto').checked = !!st.supercell_autosync;
+  $('#st-ev-url').value = st.evolution_url||'';
+  $('#st-ev-inst').value = st.evolution_instance||'principal';
+  $('#st-ev-key').value = st.evolution_apikey||'';
+  $('#st-ev-num').value = st.evolution_number||'';
+  $('#st-apikey').value = ME.api_key_hint ? `•••• ${ME.api_key_hint} (gere outra para ver uma chave nova)` : 'nenhuma chave ainda';
+  $('#st-apikey-copy').style.display = 'none';
+  renderAccountBox();
+  openModal('m-settings');
+  loadNotifyStatus();
+  loadSubscribers();
+}
+function renderAccountBox(){
+  const box = $('#st-account');
+  if(isOwner()){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  const until = ME.active ? `Passe ativo até <b>${fmtDay(ME.access_until)}</b>.` : '<b style="color:var(--err)">Passe inativo.</b>';
+  const lim = ME.limits ? `<br>Até ${ME.limits.accounts} vilas; cada vila guarda os ${ME.limits.snapshots} imports mais recentes.` : '';
+  const manage = ME.labs && ME.labs.account ? ` <a href="${esc(ME.labs.account)}">Gerenciar na Clash Labs</a> ·` : '';
+  $('#st-account-body').innerHTML = `${esc(ME.name||'')} · ${esc(ME.email||'')}<br>${until}${lim}<br>${manage} <a href="#" onclick="logout();return false">Sair</a>`;
+}
+async function loadSubscribers(){
+  const box = $('#st-subs');
+  if(!isOwner() || !(ME.labs && ME.labs.enabled)){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  try{
+    const list = await API('/admin/subscribers');
+    const now = Date.now()/1000;
+    $('#st-subs-body').innerHTML = list.length ? `<table><thead><tr><th>Assinante</th><th>Passe</th><th class="num">Vilas</th><th>Último acesso</th></tr></thead><tbody>${
+      list.map(u=>`<tr><td>${esc(u.name||'')}<div class="muted">${esc(u.email||'')}</div></td>
+        <td>${u.access_until && u.access_until>now ? 'até '+fmtDay(u.access_until) : '<span style="color:var(--err)">inativo</span>'}</td>
+        <td class="num">${u.villages}</td><td class="muted">${u.last_login_at?fmtAgo(u.last_login_at):'—'}</td></tr>`).join('')
+    }</tbody></table>` : '<div class="muted" style="padding:8px">Nenhum assinante entrou ainda.</div>';
+  }catch(e){ $('#st-subs-body').innerHTML = '<div class="muted" style="padding:8px">não foi possível carregar os assinantes</div>'; }
+}
+async function newApiKey(){
+  if(ME.api_key_hint && !confirm('Gerar outra API key? A chave atual para de funcionar na hora (automação e integrações).')) return;
+  try{
+    const j = await post('/apikey', {});
+    ME.api_key_hint = j.hint;
+    $('#st-apikey').value = j.api_key;
+    $('#st-apikey-copy').style.display = '';
+    toast('Nova API key gerada. Copie agora: ela não aparece de novo.');
+  }catch(e){ toast('Erro: '+esc(e.message), true); }
+}
+async function saveSettings(){
+  try{
+    const body = {
+      notify_enabled: $('#st-notify').checked,
+      lead_minutes: parseInt($('#st-lead').value||'0'),
+      digest_time: $('#st-digest').value.trim(),
+      telegram_token: $('#st-tg-token').value.trim(),
+      telegram_chat_id: $('#st-tg-chat').value.trim(),
+      discord_webhook: $('#st-discord').value.trim(),
+      supercell_autosync: $('#st-sc-auto').checked,
+      evolution_url: $('#st-ev-url').value.trim(),
+      evolution_instance: $('#st-ev-inst').value.trim() || 'principal',
+      evolution_apikey: $('#st-ev-key').value.trim(),
+      evolution_number: $('#st-ev-num').value.trim(),
+    };
+    if(isOwner()){
+      body.toast_enabled = $('#st-toast').checked;
+      body.supercell_token = $('#st-sc-token').value.trim();
+    }
+    await post('/settings', body, 'PUT');
+    const temCanal = (isOwner() && $('#st-toast').checked) || $('#st-tg-token').value.trim() || $('#st-discord').value.trim() || $('#st-ev-key').value.trim();
+    if(temCanal && !$('#st-notify').checked){
+      closeModals(); toast('Configurações salvas — mas ⚠ <b>"Ativar alertas" está desmarcado</b>: nenhum aviso automático será enviado.', true);
+    } else {
+      closeModals(); toast('Configurações salvas ✔');
+    }
+  }catch(e){ toast('Erro: '+esc(e.message), true); }
+}
+async function testNotify(){
+  const r = await post('/notify/test', {});
+  let msg = r.sent.length ? 'Enviado via: '+r.sent.join(', ')+' ✔' : 'Nenhum canal ativo/funcionando — confira os campos.';
+  if(r.sent.length && !r.notify_enabled)
+    msg += '<br>⚠ <b>Atenção:</b> os alertas automáticos estão DESATIVADOS — marque "Ativar alertas" e salve.';
+  toast(msg, !r.sent.length);
+}
+async function loadNotifyStatus(){
+  const el = $('#st-nstatus'); if(!el) return;
+  try{
+    const n = await API('/notify/status');
+    const master = n.enabled ? '<b style="color:var(--ok)">ATIVOS</b>' : '<b style="color:var(--err)">DESATIVADOS</b> (marque "Ativar alertas" acima)';
+    const canais = n.channels.length ? n.channels.join(', ') : 'nenhum canal configurado';
+    const scan = n.last_scan ? new Date(n.last_scan*1000).toLocaleTimeString('pt-BR') : 'ainda não rodou';
+    const prox = n.upcoming.length ? n.upcoming.slice(0,6).map(u=>
+      `${esc(u.name)} → lv ${esc(u.to_lvl)} (${esc(u.account)}) — ${fmtDate(u.finish_ts)}${u.already_notified?' ✓ notificado':''}`).join('<br>') : 'nenhum upgrade em andamento no último export';
+    el.innerHTML = `Alertas: ${master} · canais: ${esc(canais)}<br>última varredura: ${scan} (a cada ${n.scan_interval_s}s)${n.sent_since_boot!=null?` · enviados desde o boot: ${n.sent_since_boot}`:''}<br><b>Próximos disparos:</b><br>${prox}`;
+  }catch(e){ el.textContent = 'não foi possível carregar o estado'; }
+}
+async function showRaw(aid){
+  const d = await API(`/accounts/${aid}/detail`);
+  $('#raw-json').textContent = JSON.stringify(d.player?._raw || d.player || {}, null, 2);
+  openModal('m-raw');
+}
+async function verifyAccount(){
+  try{
+    const id = $('#edit-id').value;
+    const j = await post(`/accounts/${id}/verify`, {token: $('#edit-gametoken').value.trim()});
+    toast('✅ Posse da conta verificada!'); closeModals(); refresh();
+  }catch(e){ toast(esc(e.message), true); }
+}
+async function syncSupercell(aid){
+  try{
+    const j = await post(`/accounts/${aid}/sync-supercell`, {});
+    toast(`🏆 ${esc(j.name)}: ${esc(j.trophies)} troféus${j.league?' ('+esc(j.league)+')':''} ✔${j.account&&j.account.name===j.name?' — nome da conta atualizado':''}`);
+    if(currentView.page==='detail') goDetail(aid); else refresh();
+  }catch(e){ toast(esc(e.message), true); }
+}
+
+/* ============ passe inativo ============ */
+let LAPSED = false;
+function renderLapsed(j){
+  LAPSED = true;
+  document.querySelectorAll('.top-actions > :not(#btn-logout)').forEach(el=>el.style.display='none');
+  $('#btn-logout').style.display = '';
+  const store = j && j.store ? j.store : (ME.labs && ME.labs.store);
+  $('#view').innerHTML = `<div class="empty"><div class="big">⏸</div>
+    <p><b>Seu passe do COC Control não está ativo.</b></p>
+    <p style="margin:8px 0 16px">Suas vilas, o histórico e os alertas continuam guardados.<br>
+    Renove na Clash Labs e tudo volta como estava.</p>
+    ${store?`<a class="btn primary" style="text-decoration:none;display:inline-block" href="${esc(store)}">Renovar na Clash Labs</a>`:''}
+    <button class="btn" onclick="logout()">Sair</button></div>`;
+}
+
+/* ============ refresh & polling ============ */
+async function refresh(){
+  if(LAPSED) return;
+  accounts = await API('/accounts');
+  if(currentView.page==='detail'){
+    const still = accounts.find(a=>a.id===currentView.id);
+    if(still) return goDetail(currentView.id);
+    currentView={page:'home'};
+  }
+  renderHome();
+}
+async function pollStatus(){
+  try{
+    const st = await API('/status');
+    watcherState = st.watcher; renderWatcher();
+    gdVersion = st.gamedata.source_version ? 'v'+st.gamedata.source_version : '';
+    $('#gd-info').textContent = `base: ${st.gamedata.entity_count} entidades ${gdVersion?'· '+gdVersion:''} · ${(st.gamedata.generated_at||'').slice(0,10)}`;
+    if(st.auth) $('#btn-logout').style.display = st.auth.enabled ? '' : 'none';
+    const ev = st.watcher.last_event;
+    if(ev && ev.seq>lastEventSeq){
+      lastEventSeq = ev.seq;
+      if(ev.kind==='import'){ toast(`📋 Watcher: vila <b>${esc(ev.tag)}</b> importada em <b>${esc(ev.account)}</b> ✔`); refresh(); }
+      else if(ev.kind==='error'){ toast('Watcher: '+esc(ev.error), true); }
+    }
+  }catch(e){ /* servidor reiniciando */ }
+}
+(async function init(){
+  ME = await API('/me').catch(()=>ME);
+  applyRole();
+  const st = await API('/status').catch(()=>null);
+  if(st){ watcherState=st.watcher; lastEventSeq=st.watcher.last_event?.seq||0; renderWatcher();
+    gdVersion = st.gamedata.source_version ? 'v'+st.gamedata.source_version : '';
+    $('#gd-info').textContent = `base: ${st.gamedata.entity_count} entidades ${gdVersion?'· '+gdVersion:''} · ${(st.gamedata.generated_at||'').slice(0,10)}`; }
+  if(ME.active === false) renderLapsed({});
+  else await refresh().catch(()=>{});
+  setInterval(()=>{ if(!LAPSED) pollStatus(); }, 3000);
+  setInterval(()=>{ if(!LAPSED) browserWatchTick(); }, 2500);
+  setInterval(()=>{ if(LAPSED) return; if(currentView.page==='detail') goDetail(currentView.id).catch(()=>{}); else refresh().catch(()=>{}); }, 60000);
+})();
+</script>
+</body>
+</html>

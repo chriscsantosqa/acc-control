@@ -1,0 +1,145 @@
+{
+ "_doc": "Entidades extras/novas que a base estática ainda não cobre. Edite livremente: chave = dataId do export, valor = {name, category, base, levels:[{lvl,cost,res,secs,th}]}. Categorias: defense|trap|wall|resource|army|hero|troop|spell|siege|pet|equipment|guardian|other",
+ "entities": {
+  "103000008": {
+   "id": "roaster-crafted",
+   "name": "Roaster (Estação de Criação)",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "103000009": {
+   "id": "air-bombs-crafted",
+   "name": "Air Bombs (Estação de Criação)",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "103000010": {
+   "id": "lava-launcher-crafted",
+   "name": "Lava Launcher (Estação de Criação)",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000024": {
+   "id": "mod-roaster-1",
+   "name": "Roaster — Módulo 1",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000025": {
+   "id": "mod-roaster-2",
+   "name": "Roaster — Módulo 2",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000026": {
+   "id": "mod-roaster-3",
+   "name": "Roaster — Módulo 3",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000027": {
+   "id": "mod-airbombs-1",
+   "name": "Air Bombs — Módulo 1",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000028": {
+   "id": "mod-airbombs-2",
+   "name": "Air Bombs — Módulo 2",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000029": {
+   "id": "mod-airbombs-3",
+   "name": "Air Bombs — Módulo 3",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000030": {
+   "id": "mod-lavalauncher-1",
+   "name": "Lava Launcher — Módulo 1",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000031": {
+   "id": "mod-lavalauncher-2",
+   "name": "Lava Launcher — Módulo 2",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "102000032": {
+   "id": "mod-lavalauncher-3",
+   "name": "Lava Launcher — Módulo 3",
+   "base": "home",
+   "category": "defense",
+   "levels": []
+  },
+  "4000109": {
+   "id": "troop-4000109",
+   "name": "Tropa nova (4000109)",
+   "base": "home",
+   "category": "troop",
+   "levels": []
+  },
+  "4000188": {
+   "id": "siege-4000188",
+   "name": "Máq. de cerco nova (4000188)",
+   "base": "home",
+   "category": "siege",
+   "levels": []
+  },
+  "26000123": {
+   "id": "spell-26000123",
+   "name": "Feitiço novo (26000123)",
+   "base": "home",
+   "category": "spell",
+   "levels": []
+  },
+  "90000060": {
+   "id": "equip-90000060",
+   "name": "Equipamento novo (90000060)",
+   "base": "home",
+   "category": "equipment",
+   "levels": []
+  },
+  "107000008": {
+   "id": "guardian-107000008",
+   "name": "Guardião novo (107000008)",
+   "base": "home",
+   "category": "guardian",
+   "levels": []
+  },
+  "93000003": {
+   "id": "alchemist",
+   "name": "Alchemist (ajudante)",
+   "base": "home",
+   "category": "other",
+   "levels": []
+  },
+  "90000016": {
+   "id": "equip-90000016",
+   "name": "Equipamento (90000016)",
+   "base": "home",
+   "category": "equipment",
+   "levels": []
+  },
+  "90000059": {
+   "id": "equip-90000059",
+   "name": "Equipamento (90000059)",
+   "base": "home",
+   "category": "equipment",
+   "levels": []
+  }
+ }
+}

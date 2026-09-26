@@ -1,0 +1,29 @@
+services:
+  coc-control:
+    build: .
+    container_name: coc-control
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - coc_data:/data
+    # Acesso direto pela porta (simples). Se usar proxy reverso (Traefik/NPM),
+    # comente 'ports', descomente 'expose' e conecte na network do proxy.
+    ports:
+      - "8420:8420"
+    # expose:
+    #   - "8420"
+    # networks:
+    #   - proxy
+    # labels:  # exemplo Traefik
+    #   - traefik.enable=true
+    #   - traefik.http.routers.coc.rule=Host(`coc.chriscsantosqa.tech`)
+    #   - traefik.http.routers.coc.entrypoints=websecure
+    #   - traefik.http.routers.coc.tls.certresolver=letsencrypt
+    #   - traefik.http.services.coc.loadbalancer.server.port=8420
+
+volumes:
+  coc_data:
+
+# networks:
+#   proxy:
+#     external: true
