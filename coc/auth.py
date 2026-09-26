@@ -25,6 +25,16 @@ import os
 import secrets
 import time
 
+# O projeto documenta .env como configuração principal. Carregue-o antes de
+# importar db/labs, pois esses módulos também consultam variáveis de ambiente.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Mantém compatibilidade com instalações antigas; requirements.txt instala
+    # python-dotenv nas instalações novas.
+    pass
+
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db, labs
