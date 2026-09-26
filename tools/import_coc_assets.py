@@ -143,7 +143,9 @@ def _manifest_entry(rel: Path) -> dict:
 
     if category in {"buildings", "traps"} and len(parts) >= 4:
         base, entity = parts[1], parts[2]
-    elif category in {"heroes", "pets", "helpers"} and len(parts) >= 3:
+    elif category in {"heroes", "pets", "helpers", "troops", "equipment"} and len(parts) >= 3:
+        # ClashKingAssets organiza estes catálogos como categoria/entidade/arquivo.
+        # O entity é necessário para resolver icon.webp e variações por nome.
         entity = parts[1]
     elif len(parts) >= 2:
         entity = rel.stem
