@@ -7,97 +7,45 @@
 <style>
 :root{--bg:#0b1220;--card:#131e33;--line:#22334f;--tx:#e7eefc;--tx2:#8fa3c4;--acc:#4da3ff;--err:#ff5d5d}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:linear-gradient(180deg,#0b1220,#0f1729);color:var(--tx);font:14px/1.5 'Segoe UI',system-ui,sans-serif;
-  min-height:100vh;display:flex;align-items:center;justify-content:center}
-.box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px;width:min(380px,92vw);
-  box-shadow:0 18px 50px rgba(0,0,0,.5)}
-h1{font-size:22px;margin-bottom:4px}h1 span{color:var(--acc)}
-p.sub{color:var(--tx2);font-size:12.5px;margin-bottom:22px}
-label{display:block;font-size:12px;color:var(--tx2);margin:12px 0 5px}
-input{width:100%;background:#0d1626;border:1px solid var(--line);border-radius:9px;color:var(--tx);
-  padding:11px 13px;font:inherit}
-input:focus{outline:none;border-color:var(--acc)}
-button{width:100%;margin-top:20px;background:var(--acc);border:none;border-radius:9px;color:#06101f;
-  font-weight:700;font-size:14px;padding:12px;cursor:pointer}
-button:hover{filter:brightness(1.1)}
-button:disabled{opacity:.6;cursor:wait}
-.err{background:#2a1215;border:1px solid #6b2020;color:#ff9d9d;border-radius:9px;padding:10px 12px;
-  font-size:12.5px;margin-top:14px;display:none}
-.foot{margin-top:18px;text-align:center;color:#5f7396;font-size:11px}
-.labs-btn{display:block;text-align:center;margin-top:4px;background:#f7c948;color:#1a1204;border-radius:9px;
-  font-weight:700;padding:12px;text-decoration:none}
-.labs-btn:hover{filter:brightness(1.08)}
-.hint{color:var(--tx2);font-size:12px;margin-top:8px;text-align:center}
-.hint a{color:var(--acc)}
-.or{display:flex;align-items:center;gap:10px;color:#5f7396;font-size:11px;margin:20px 0 4px;text-transform:uppercase;letter-spacing:.5px}
-.or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}
-.note{background:#102336;border:1px solid #1c4566;color:#8fd0ff;border-radius:9px;padding:10px 12px;
-  font-size:12.5px;margin-bottom:14px;display:none}
-.note a{color:#f7c948}
+body{background:linear-gradient(180deg,#0b1220,#0f1729);color:var(--tx);font:14px/1.5 'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px;width:min(380px,92vw);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+h1{font-size:22px;margin-bottom:4px}h1 span{color:var(--acc)}p.sub{color:var(--tx2);font-size:12.5px;margin-bottom:22px}
+label{display:block;font-size:12px;color:var(--tx2);margin:12px 0 5px}input{width:100%;background:#0d1626;border:1px solid var(--line);border-radius:9px;color:var(--tx);padding:11px 13px;font:inherit}input:focus{outline:none;border-color:var(--acc)}
+button{width:100%;margin-top:20px;background:var(--acc);border:none;border-radius:9px;color:#06101f;font-weight:700;font-size:14px;padding:12px;cursor:pointer}button:hover{filter:brightness(1.1)}button:disabled{opacity:.6;cursor:wait}
+.err{background:#2a1215;border:1px solid #6b2020;color:#ff9d9d;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-top:14px;display:none}.foot{margin-top:18px;text-align:center;color:#5f7396;font-size:11px}
+.labs-btn{display:block;text-align:center;margin-top:4px;background:#f7c948;color:#1a1204;border-radius:9px;font-weight:700;padding:12px;text-decoration:none}.labs-btn:hover{filter:brightness(1.08)}
+.hint{color:var(--tx2);font-size:12px;margin-top:8px;text-align:center}.hint a{color:var(--acc)}.or{display:flex;align-items:center;gap:10px;color:#5f7396;font-size:11px;margin:20px 0 4px;text-transform:uppercase;letter-spacing:.5px}.or::before,.or::after{content:'';flex:1;height:1px;background:var(--line)}
+.note{background:#102336;border:1px solid #1c4566;color:#8fd0ff;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:14px;display:none}.note a{color:#f7c948}
 </style>
 <link rel="stylesheet" href="/static/fantasy-theme.css?v=20260926">
-<link rel="stylesheet" href="/static/fantasy-fixes.css?v=20260926-2">
+<link rel="stylesheet" href="/static/fantasy-fixes.css?v=20260926-3">
 </head>
 <body>
 <form class="box" id="f">
   <h1>🏰 COC <span>Control</span></h1>
-  <p class="sub">Área privada — identifique-se para continuar.</p>
+  <p class="sub" id="subtitle">Área privada — identifique-se para continuar.</p>
   <div class="note" id="flag" role="status"></div>
   <div id="labs" style="display:none">
     <a class="labs-btn" href="/entrar/clash-labs">Entrar com a Clash Labs</a>
     <p class="hint">Assinantes entram com a conta da Clash Labs. <a id="store" href="#">Ainda não assina?</a></p>
     <div class="or">acesso do administrador</div>
   </div>
-  <label>Usuário</label>
-  <input id="u" autocomplete="username" required>
-  <label>Senha</label>
-  <input id="p" type="password" autocomplete="current-password" required>
+  <div id="adminFields">
+    <label>Usuário</label><input id="u" autocomplete="username" required>
+    <label>Senha</label><input id="p" type="password" autocomplete="current-password" required>
+  </div>
   <button id="b" type="submit">Entrar</button>
   <div class="err" id="e"></div>
-  <div class="foot">Acesso monitorado · tentativas em excesso bloqueiam o IP</div>
+  <div class="foot" id="foot">Acesso monitorado · tentativas em excesso bloqueiam o IP</div>
 </form>
 <script>
-const FLAGS = {
-  inativo: 'Seu passe do COC Control não está ativo. Suas vilas continuam guardadas: renove na Clash Labs para voltar.',
-  expirou: 'O pedido de entrada expirou. Clique em Entrar com a Clash Labs de novo.',
-  erro: 'Não foi possível confirmar sua entrada pela Clash Labs. Tente de novo.',
-};
-(async () => {
-  let info = {};
-  try { info = await (await fetch('/api/labs/info')).json(); } catch (_) {}
-  const flag = new URLSearchParams(location.search).get('passe');
-  const box = document.getElementById('flag');
-  if (FLAGS[flag]) {
-    box.textContent = FLAGS[flag];
-    if (flag === 'inativo' && info.store) {
-      const a = document.createElement('a');
-      a.href = info.store; a.textContent = ' Renovar agora';
-      box.appendChild(a);
-    }
-    box.style.display = 'block';
-  }
-  if (info.enabled) {
-    document.getElementById('labs').style.display = 'block';
-    if (info.store) document.getElementById('store').href = info.store;
-  } else {
-    document.getElementById('u').focus();
-  }
-})();
-document.getElementById('f').addEventListener('submit', async ev=>{
-  ev.preventDefault();
-  const b=document.getElementById('b'), e=document.getElementById('e');
-  b.disabled=true; e.style.display='none';
-  try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});
-    const j=await r.json();
-    if(r.ok){ location.href='/'; return; }
-    e.textContent=j.error||'falha no login'; e.style.display='block';
-  }catch(_){ e.textContent='erro de conexão'; e.style.display='block'; }
-  b.disabled=false;
-});
+const FLAGS={inativo:'Seu passe do COC Control não está ativo. Suas vilas continuam guardadas: renove na Clash Labs para voltar.',expirou:'O pedido de entrada expirou. Clique em Entrar com a Clash Labs de novo.',erro:'Não foi possível confirmar sua entrada pela Clash Labs. Tente de novo.'};
+let LOCAL_MODE=new URLSearchParams(location.search).get('local')==='1';
+function renderLocalMode(){LOCAL_MODE=true;document.getElementById('adminFields').style.display='none';document.getElementById('u').required=false;document.getElementById('p').required=false;document.getElementById('b').textContent='Entrar localmente';document.getElementById('subtitle').textContent='Modo local — autenticação por senha não está habilitada.';const note=document.getElementById('flag');note.textContent='O COC Control está em modo local aberto. Para exigir usuário e senha, configure ADMIN_PASSWORD ou ADMIN_PASSWORD_HASH no arquivo .env.';note.style.display='block';document.getElementById('foot').textContent='Modo local aberto · qualquer acesso direto ao servidor entra como owner';}
+(async()=>{let info={};try{info=await(await fetch('/api/labs/info',{cache:'no-store'})).json();}catch(_){}const flag=new URLSearchParams(location.search).get('passe');const box=document.getElementById('flag');if(FLAGS[flag]){box.textContent=FLAGS[flag];if(flag==='inativo'&&info.store){const a=document.createElement('a');a.href=info.store;a.textContent=' Renovar agora';box.appendChild(a);}box.style.display='block';}if(!LOCAL_MODE){try{const r=await fetch('/api/status',{cache:'no-store',credentials:'same-origin'});if(r.ok){const s=await r.json();if(s?.auth?.enabled===false)LOCAL_MODE=true;}}catch(_){}}if(LOCAL_MODE){renderLocalMode();return;}if(info.enabled){document.getElementById('labs').style.display='block';if(info.store)document.getElementById('store').href=info.store;}else document.getElementById('u').focus();})();
+document.getElementById('f').addEventListener('submit',async ev=>{ev.preventDefault();const b=document.getElementById('b'),e=document.getElementById('e');b.disabled=true;e.style.display='none';if(LOCAL_MODE){location.replace('/');return;}try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',credentials:'same-origin',body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});const j=await r.json();if(r.ok){location.replace('/');return;}e.textContent=j.error||'falha no login';e.style.display='block';}catch(_){e.textContent='erro de conexão';e.style.display='block';}b.disabled=false;});
 </script>
 <script src="/static/fantasy-theme.js?v=20260926"></script>
-<script src="/static/fantasy-fixes.js?v=20260926-2"></script>
+<script src="/static/fantasy-fixes.js?v=20260926-3"></script>
 </body>
 </html>
