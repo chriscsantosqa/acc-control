@@ -34,6 +34,16 @@ jobs:
         run: |
           python -m py_compile app.py coc/*.py tools/import_coc_assets.py tests/test_contract_refactor.py tests/test_local_login.py
 
+      - name: Validate faceoff UI assets
+        run: |
+          test -f static/faceoff-theme.css
+          test -f static/assets/branding/soul-weaver.webp
+          test -f static/assets/branding/void-archmage.webp
+          grep -q "faceoff-scene" static/fantasy-theme.js
+          grep -q "soul-weaver.webp" static/fantasy-theme.js
+          grep -q "void-archmage.webp" static/fantasy-theme.js
+          grep -q "pointer-events: none" static/faceoff-theme.css
+
       - name: Run regression suite
         env:
           PYTHONUNBUFFERED: "1"
