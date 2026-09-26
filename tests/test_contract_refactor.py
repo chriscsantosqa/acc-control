@@ -60,6 +60,13 @@ def data_id(entity_id):
     raise AssertionError(f"entidade ausente no game_data: {entity_id}")
 
 
+def data_id_by_name(name, base):
+    for raw, entity in gamedata.load()["entities"].items():
+        if entity.get("name") == name and entity.get("base", "home") == base:
+            return int(raw)
+    raise AssertionError(f"entidade ausente no game_data: {name} ({base})")
+
+
 snapshot = {
     "timestamp": int(time.time()),
     "th_level": 18,
@@ -70,8 +77,8 @@ snapshot = {
         {"data": data_id("town-hall"), "lvl": 18, "cnt": 1, "timer": None, "known": True, "ignored": False},
         {"data": data_id("builders-apprentice"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
         {"data": data_id("lab-assistant"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
-        {"data": data_id("builder-hall"), "lvl": 6, "cnt": 1, "timer": None, "known": True, "ignored": False},
-        {"data": data_id("bb-cannon"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
+        {"data": data_id_by_name("Builder Hall", "builder"), "lvl": 6, "cnt": 1, "timer": None, "known": True, "ignored": False},
+        {"data": data_id_by_name("Cannon", "builder"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
     ],
 }
 summary = metrics.compute(snapshot)
