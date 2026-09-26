@@ -1,0 +1,122 @@
+/* Interaction and dashboard composition fixes for the fantasy theme. */
+
+/* Decorative layers must never capture user interaction. */
+.coc-fx,
+.coc-fx *,
+.fx-stars,
+.coc-character,
+body::before,
+body::after,
+.scroll-progress {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* Functional UI always stays above the decorative scene. */
+.dashboard-page .shell { position: relative; z-index: 3 !important; }
+.dashboard-page .side { position: sticky; z-index: 8 !important; }
+.dashboard-page .main { position: relative; z-index: 5 !important; }
+.dashboard-page .top { z-index: 30 !important; }
+.dashboard-page #app,
+.dashboard-page .tabs,
+.dashboard-page .hero,
+.dashboard-page .section,
+.dashboard-page .card,
+.dashboard-page .item,
+.dashboard-page .resource { position: relative; z-index: 2; }
+.dashboard-page .modal-bg { z-index: 200 !important; }
+.dashboard-page button,
+.dashboard-page a,
+.dashboard-page input,
+.dashboard-page textarea,
+.dashboard-page select,
+.login-page button,
+.login-page a,
+.login-page input { pointer-events: auto !important; }
+
+/* Dashboard: ClashNato-inspired face-to-face composition.
+   The stage is a top-page background, not a fixed overlay over all content. */
+.dashboard-page { position: relative; isolation: isolate; }
+.dashboard-page .coc-fx {
+  position: absolute !important;
+  inset: 0 0 auto 0 !important;
+  height: min(860px, 92vh) !important;
+  z-index: 1 !important;
+  overflow: hidden;
+  opacity: 1;
+  background:
+    radial-gradient(circle at 34% 27%, rgba(53, 220, 255, .16), transparent 23rem),
+    radial-gradient(circle at 73% 24%, rgba(156, 62, 255, .18), transparent 25rem),
+    linear-gradient(90deg, rgba(4, 8, 18, .12), rgba(5, 8, 19, .44) 45%, rgba(5, 8, 19, .44) 55%, rgba(4, 8, 18, .12));
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+}
+.dashboard-page .coc-fx::before,
+.dashboard-page .coc-fx::after { opacity: .42 !important; }
+
+.dashboard-page .coc-character {
+  top: 58px !important;
+  bottom: auto !important;
+  height: min(78vh, 790px) !important;
+  max-width: 38vw !important;
+  opacity: .34 !important;
+  filter: drop-shadow(0 30px 56px rgba(0,0,0,.72));
+  transform-origin: center center;
+}
+.dashboard-page .coc-character.blue {
+  left: max(225px, calc(270px + 1vw)) !important;
+  right: auto !important;
+  transform: translate3d(var(--blue-x, 0), var(--blue-y, 0), 0) translateX(-24%) scale(.96) !important;
+  filter: drop-shadow(0 0 44px rgba(71, 224, 255, .34)) drop-shadow(0 32px 58px rgba(0,0,0,.7)) !important;
+}
+.dashboard-page .coc-character.purple {
+  right: -2.5vw !important;
+  left: auto !important;
+  transform: translate3d(var(--purple-x, 0), var(--purple-y, 0), 0) translateX(20%) scale(.96) !important;
+  filter: drop-shadow(0 0 46px rgba(170, 72, 255, .36)) drop-shadow(0 32px 58px rgba(0,0,0,.7)) !important;
+}
+
+/* Keep central dashboard content legible while retaining the face-off art. */
+.dashboard-page .main::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  top: 0;
+  left: 4%;
+  right: 4%;
+  height: min(760px, 82vh);
+  background: radial-gradient(ellipse at 50% 28%, rgba(5, 9, 20, .66) 0%, rgba(5, 9, 20, .42) 37%, transparent 73%);
+  filter: blur(10px);
+}
+.dashboard-page .main > * { position: relative; z-index: 1; }
+
+/* Hero and top navigation get stronger contrast over the face-off scene. */
+.dashboard-page .hero {
+  background: linear-gradient(115deg, rgba(10, 24, 45, .88), rgba(7, 13, 29, .78) 48%, rgba(36, 13, 55, .76)) !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,.36), 0 0 42px rgba(65,210,255,.08), 0 0 46px rgba(164,74,255,.08) !important;
+}
+.dashboard-page .top {
+  background: rgba(6, 10, 22, .82) !important;
+  border-color: rgba(125, 184, 240, .23) !important;
+}
+
+/* Login: visual characters remain visible but can never block the form. */
+.login-page .coc-fx { z-index: 0 !important; pointer-events: none !important; }
+.login-page .box { position: relative; z-index: 10 !important; }
+.login-page .coc-character { pointer-events: none !important; }
+
+/* Smaller screens: preserve content first. */
+@media (max-width: 1180px) {
+  .dashboard-page .coc-character { opacity: .22 !important; max-width: 34vw !important; }
+  .dashboard-page .coc-character.blue { left: 225px !important; }
+}
+@media (max-width: 900px) {
+  .dashboard-page .coc-character { opacity: .12 !important; height: 60vh !important; }
+  .dashboard-page .coc-character.blue { left: 0 !important; }
+  .dashboard-page .coc-character.purple { right: -10vw !important; }
+}
+@media (max-width: 780px) {
+  .dashboard-page .coc-fx { display: none !important; }
+  .dashboard-page .main::before { display: none; }
+}
