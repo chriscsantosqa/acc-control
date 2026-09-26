@@ -20,6 +20,8 @@ try:
 except ImportError:
     requests = None
 
+from werkzeug.exceptions import BadGateway
+
 from . import db
 
 PRODUCT = "coc-control"
@@ -47,8 +49,10 @@ def account_url():
     return f"{url}/conta" if url else None
 
 
-class LabsError(Exception):
-    """Falha de comunicação/contrato com a Clash Labs."""
+class LabsError(BadGateway):
+    """Falha de comunicação/contrato com a Clash Labs (HTTP 502 no webhook)."""
+
+    description = "Não foi possível consultar a Clash Labs"
 
 
 def valid_labs_user_id(value):
@@ -64,10 +68,10 @@ def valid_labs_user_id(value):
 
 def _hub(path, method="GET", body=None):
     if not requests:
-        raise LabsError("pacote 'requests' não instalado")
+        raise LabsError()
     _, api, secret = _env()
     if not api or len(secret) < 32:
-        raise LabsError("integração Clash Labs não configurada")
+        raise LabsError()
     try:
         r = requests.request(
             method,
@@ -82,13 +86,13 @@ def _hub(path, method="GET", body=None):
             },
         )
     except Exception as exc:
-        raise LabsError("não foi possível consultar a Clash Labs") from exc
+        raise LabsError() from exc
     if r.status_code != 200:
-        raise LabsError(f"Clash Labs respondeu {r.status_code}")
+        raise LabsError()
     try:
         return r.json()
     except Exception as exc:
-        raise LabsError("resposta inválida da Clash Labs") from exc
+        raise LabsError() from exc
 
 
 def access_until(ent, now=None):
@@ -114,8 +118,6 @@ def has_access(user, now=None):
         return False
     if user["role"] == "owner":
         return True
-    # Campos opcionais para bancos que já receberam a migração de suspensão manual.
-    # A sincronização de entitlement nunca deve reativar uma suspensão operacional.
     if user.get("suspended_at"):
         return False
     return bool(user.get("access_until") and user["access_until"] > (now or time.time()))
@@ -169,7 +171,7 @@ def refresh(con, user, strict=False):
     """Relê o entitlement.
 
     Em navegação comum preserva o último estado se a central estiver indisponível.
-    No webhook ``strict=True`` para que a rota possa devolver 502 e solicitar retry.
+    No webhook ``strict=True`` faz a exceção chegar ao Flask como 502.
     """
     if not enabled() or not user or user["role"] != "subscriber" or not user.get("labs_user_id"):
         return user
