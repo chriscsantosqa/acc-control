@@ -6,14 +6,36 @@
   const isLogin = Boolean(document.querySelector('form.box#f')) || location.pathname.includes('login');
   body.classList.add(isLogin ? 'login-page' : 'dashboard-page');
 
+  /* Load the dedicated faceoff layer on every screen that already loads this theme. */
+  if (!document.querySelector('link[data-faceoff-theme]')) {
+    const faceoffCss = document.createElement('link');
+    faceoffCss.rel = 'stylesheet';
+    faceoffCss.href = '/static/faceoff-theme.css?v=20260926-1';
+    faceoffCss.dataset.faceoffTheme = '1';
+    document.head.appendChild(faceoffCss);
+  }
+
+  /* Characters are part of the global background, not interactive overlays. */
+  if (!document.querySelector('.faceoff-scene')) {
+    const faceoff = document.createElement('div');
+    faceoff.className = `faceoff-scene ${isLogin ? 'faceoff-login' : 'faceoff-platform'}`;
+    faceoff.setAttribute('aria-hidden', 'true');
+    faceoff.innerHTML = `
+      <div class="faceoff-character faceoff-left">
+        <img src="/static/assets/branding/soul-weaver.webp" alt="">
+      </div>
+      <div class="faceoff-character faceoff-right">
+        <img src="/static/assets/branding/void-archmage.webp" alt="">
+      </div>
+    `;
+    body.prepend(faceoff);
+  }
+
+  /* Ambient FX remain separate from the character scene. */
   const fx = document.createElement('div');
   fx.className = 'coc-fx';
   fx.setAttribute('aria-hidden', 'true');
-  fx.innerHTML = `
-    <div class="fx-stars"></div>
-    <img class="coc-character blue" src="/static/assets/branding/soul-weaver.webp" alt="">
-    <img class="coc-character purple" src="/static/assets/branding/void-archmage.webp" alt="">
-  `;
+  fx.innerHTML = '<div class="fx-stars"></div>';
   body.prepend(fx);
 
   const progress = document.createElement('div');
@@ -38,14 +60,15 @@
         raf = 0;
         const x = event.clientX;
         const y = event.clientY;
+        const nx = x / Math.max(innerWidth, 1) - .5;
+        const ny = y / Math.max(innerHeight, 1) - .5;
+
         document.documentElement.style.setProperty('--mx', `${x}px`);
         document.documentElement.style.setProperty('--my', `${y}px`);
-        const nx = (x / Math.max(innerWidth, 1) - .5);
-        const ny = (y / Math.max(innerHeight, 1) - .5);
-        document.documentElement.style.setProperty('--blue-x', `${nx * 16}px`);
-        document.documentElement.style.setProperty('--blue-y', `${ny * 9}px`);
-        document.documentElement.style.setProperty('--purple-x', `${nx * -17}px`);
-        document.documentElement.style.setProperty('--purple-y', `${ny * -10}px`);
+        document.documentElement.style.setProperty('--faceoff-left-x', `${nx * -12}px`);
+        document.documentElement.style.setProperty('--faceoff-left-y', `${ny * -8}px`);
+        document.documentElement.style.setProperty('--faceoff-right-x', `${nx * 12}px`);
+        document.documentElement.style.setProperty('--faceoff-right-y', `${ny * -8}px`);
       });
     }, {passive: true});
   }
