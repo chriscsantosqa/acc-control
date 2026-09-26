@@ -1,0 +1,173 @@
+:root {
+  --faceoff-left-x: 0px;
+  --faceoff-left-y: 0px;
+  --faceoff-right-x: 0px;
+  --faceoff-right-y: 0px;
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* Decorative character scene shared by login and the authenticated SPA. */
+.faceoff-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  isolation: isolate;
+}
+
+.faceoff-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 22% 28%, rgba(73, 220, 255, .18), transparent 32%),
+    radial-gradient(circle at 80% 27%, rgba(174, 74, 255, .21), transparent 34%),
+    radial-gradient(circle at 50% 22%, rgba(68, 92, 180, .10), transparent 36%);
+}
+
+.faceoff-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background:
+    linear-gradient(180deg, rgba(5, 9, 21, .04) 0%, rgba(5, 9, 21, .16) 48%, rgba(5, 9, 21, .72) 100%),
+    radial-gradient(ellipse at center, transparent 0 24%, rgba(6, 10, 25, .12) 52%, rgba(6, 10, 25, .42) 100%);
+}
+
+.faceoff-character {
+  position: absolute;
+  top: 68px;
+  z-index: 1;
+  width: clamp(300px, 31vw, 610px);
+  height: calc(100vh - 68px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  opacity: .34;
+  filter:
+    saturate(1.08)
+    contrast(1.04)
+    drop-shadow(0 24px 55px rgba(0, 0, 0, .48));
+  will-change: transform;
+  transition: opacity .25s ease, filter .25s ease;
+}
+
+.faceoff-character img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center top;
+  pointer-events: none;
+  user-select: none;
+}
+
+.faceoff-left {
+  left: clamp(240px, 15vw, 300px);
+  transform: translate3d(var(--faceoff-left-x), var(--faceoff-left-y), 0);
+}
+
+.faceoff-right {
+  right: -2vw;
+  transform: translate3d(var(--faceoff-right-x), var(--faceoff-right-y), 0) scaleX(-1);
+}
+
+/* Login has no sidebar, so the composition can open wider and become more prominent. */
+.faceoff-login .faceoff-character {
+  top: 72px;
+  width: clamp(360px, 34vw, 660px);
+  height: calc(100vh - 72px);
+  opacity: .48;
+}
+
+.faceoff-login .faceoff-left {
+  left: -1.5vw;
+}
+
+.faceoff-login .faceoff-right {
+  right: -1.5vw;
+}
+
+.faceoff-login::after {
+  background:
+    radial-gradient(ellipse at center, rgba(7, 13, 30, .54) 0 20%, rgba(7, 13, 30, .28) 38%, rgba(7, 13, 30, .24) 58%, rgba(7, 13, 30, .58) 100%),
+    linear-gradient(180deg, rgba(4, 8, 18, .02), rgba(4, 8, 18, .42));
+}
+
+/* All functional layers are guaranteed to stay above the artwork. */
+.shell,
+.side,
+.main,
+.top,
+#app,
+.box,
+.modal-bg,
+.modal,
+.login-card,
+.auth-shell {
+  position: relative;
+  z-index: 4;
+}
+
+/* The sidebar remains readable and the faceoff starts inside the content area. */
+.side {
+  isolation: isolate;
+}
+
+/* Keep cards readable while still allowing the characters to be perceived as background art. */
+.main .hero,
+.main .section,
+.main .card,
+.main .top,
+.main .item,
+.main .unit {
+  backdrop-filter: blur(2px);
+}
+
+@media (max-width: 1380px) {
+  .faceoff-platform .faceoff-character {
+    width: clamp(280px, 29vw, 480px);
+    opacity: .27;
+  }
+
+  .faceoff-platform .faceoff-left {
+    left: 230px;
+  }
+}
+
+@media (max-width: 1080px) {
+  .faceoff-platform .faceoff-character {
+    opacity: .18;
+    width: 360px;
+  }
+
+  .faceoff-platform .faceoff-left {
+    left: 210px;
+  }
+
+  .faceoff-login .faceoff-character {
+    opacity: .28;
+    width: 420px;
+  }
+}
+
+@media (max-width: 780px) {
+  .faceoff-scene {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faceoff-character {
+    transition: none;
+    transform: none !important;
+  }
+}
