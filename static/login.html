@@ -36,25 +36,27 @@ button:disabled{opacity:.6;cursor:wait}
 .note a{color:#f7c948}
 </style>
 <link rel="stylesheet" href="/static/fantasy-theme.css?v=20260926">
-<link rel="stylesheet" href="/static/fantasy-fixes.css?v=20260926-2">
+<link rel="stylesheet" href="/static/fantasy-fixes.css?v=20260926-3">
 </head>
 <body>
 <form class="box" id="f">
   <h1>🏰 COC <span>Control</span></h1>
-  <p class="sub">Área privada — identifique-se para continuar.</p>
+  <p class="sub" id="subtitle">Área privada — identifique-se para continuar.</p>
   <div class="note" id="flag" role="status"></div>
   <div id="labs" style="display:none">
     <a class="labs-btn" href="/entrar/clash-labs">Entrar com a Clash Labs</a>
     <p class="hint">Assinantes entram com a conta da Clash Labs. <a id="store" href="#">Ainda não assina?</a></p>
     <div class="or">acesso do administrador</div>
   </div>
-  <label>Usuário</label>
-  <input id="u" autocomplete="username" required>
-  <label>Senha</label>
-  <input id="p" type="password" autocomplete="current-password" required>
+  <div id="adminFields">
+    <label>Usuário</label>
+    <input id="u" autocomplete="username" required>
+    <label>Senha</label>
+    <input id="p" type="password" autocomplete="current-password" required>
+  </div>
   <button id="b" type="submit">Entrar</button>
   <div class="err" id="e"></div>
-  <div class="foot">Acesso monitorado · tentativas em excesso bloqueiam o IP</div>
+  <div class="foot" id="foot">Acesso monitorado · tentativas em excesso bloqueiam o IP</div>
 </form>
 <script>
 const FLAGS = {
@@ -62,9 +64,24 @@ const FLAGS = {
   expirou: 'O pedido de entrada expirou. Clique em Entrar com a Clash Labs de novo.',
   erro: 'Não foi possível confirmar sua entrada pela Clash Labs. Tente de novo.',
 };
+let LOCAL_MODE = new URLSearchParams(location.search).get('local') === '1';
+
+function renderLocalMode() {
+  LOCAL_MODE = true;
+  document.getElementById('adminFields').style.display = 'none';
+  document.getElementById('u').required = false;
+  document.getElementById('p').required = false;
+  document.getElementById('b').textContent = 'Entrar localmente';
+  document.getElementById('subtitle').textContent = 'Modo local — autenticação por senha não está habilitada.';
+  const note = document.getElementById('flag');
+  note.textContent = 'O COC Control está em modo local aberto. Para exigir usuário e senha, configure ADMIN_PASSWORD ou ADMIN_PASSWORD_HASH no arquivo .env.';
+  note.style.display = 'block';
+  document.getElementById('foot').textContent = 'Modo local aberto · qualquer acesso direto ao servidor entra como owner';
+}
+
 (async () => {
   let info = {};
-  try { info = await (await fetch('/api/labs/info')).json(); } catch (_) {}
+  try { info = await (await fetch('/api/labs/info', {cache:'no-store'})).json(); } catch (_) {}
   const flag = new URLSearchParams(location.search).get('passe');
   const box = document.getElementById('flag');
   if (FLAGS[flag]) {
@@ -76,6 +93,22 @@ const FLAGS = {
     }
     box.style.display = 'block';
   }
+
+  if (!LOCAL_MODE) {
+    try {
+      const statusResponse = await fetch('/api/status', {cache:'no-store', credentials:'same-origin'});
+      if (statusResponse.ok) {
+        const status = await statusResponse.json();
+        if (status?.auth?.enabled === false) LOCAL_MODE = true;
+      }
+    } catch (_) {}
+  }
+
+  if (LOCAL_MODE) {
+    renderLocalMode();
+    return;
+  }
+
   if (info.enabled) {
     document.getElementById('labs').style.display = 'block';
     if (info.store) document.getElementById('store').href = info.store;
@@ -83,21 +116,28 @@ const FLAGS = {
     document.getElementById('u').focus();
   }
 })();
+
 document.getElementById('f').addEventListener('submit', async ev=>{
   ev.preventDefault();
   const b=document.getElementById('b'), e=document.getElementById('e');
   b.disabled=true; e.style.display='none';
+
+  if (LOCAL_MODE) {
+    location.replace('/');
+    return;
+  }
+
   try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',credentials:'same-origin',
       body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});
     const j=await r.json();
-    if(r.ok){ location.href='/'; return; }
+    if(r.ok){ location.replace('/'); return; }
     e.textContent=j.error||'falha no login'; e.style.display='block';
   }catch(_){ e.textContent='erro de conexão'; e.style.display='block'; }
   b.disabled=false;
 });
 </script>
 <script src="/static/fantasy-theme.js?v=20260926"></script>
-<script src="/static/fantasy-fixes.js?v=20260926-2"></script>
+<script src="/static/fantasy-fixes.js?v=20260926-3"></script>
 </body>
 </html>
