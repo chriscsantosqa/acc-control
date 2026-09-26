@@ -21,8 +21,24 @@
     subtree: true,
   });
 
-  /* Logout must not depend on the generic API renderer. Keep the current
-     screen intact until the server confirms that the session was cleared. */
+  async function authMode() {
+    try {
+      const response = await fetch('/api/status', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!response.ok) return {enabled: true};
+      const payload = await response.json();
+      return payload?.auth || {enabled: true};
+    } catch (_) {
+      return {enabled: true};
+    }
+  }
+
+  /* Logout must not depend on the generic API renderer. In authenticated mode
+     it goes to /login. In intentionally-open local mode Flask always treats the
+     owner as present, so /login redirects back to /. For that one case we show
+     the static login screen explicitly as a local-mode landing page. */
   window.logout = async function logout() {
     const token = cookie('csrf');
     const headers = token ? {'X-CSRF': token} : {};
@@ -36,6 +52,7 @@
     }
 
     try {
+      const mode = await authMode();
       const response = await fetch('/api/logout', {
         method: 'POST',
         headers,
@@ -52,7 +69,11 @@
         throw new Error(detail);
       }
 
-      location.replace('/login?logout=1');
+      if (mode.enabled === false) {
+        location.replace('/static/login.html?local=1&logout=1');
+      } else {
+        location.replace('/login?logout=1');
+      }
     } catch (error) {
       console.error('Falha ao encerrar sessão:', error);
       alert(`Não foi possível sair: ${error.message}. Recarregue a página e tente novamente.`);
