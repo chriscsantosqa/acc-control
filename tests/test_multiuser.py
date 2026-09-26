@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Testes do multiusuário: migração do banco antigo, entrada pela Clash Labs, isolamento
-entre assinantes, passe vencido, limites e canais de alerta dos assinantes.
+"""Testes do multiusuário: migração, Clash Labs, isolamento, passe, limites e alertas.
 Rodar da raiz: python tests/test_multiuser.py"""
 import datetime as dt
 import json
@@ -24,7 +23,6 @@ def check(cond, msg):
     print("  ✔", msg)
 
 
-# ------------------------------------------------ vitrine falsa (confere o segredo como a real)
 SECRET = "s" * 48
 USERS = {"A": "11111111-1111-4111-8111-111111111111", "B": "22222222-2222-4222-8222-222222222222"}
 hub = {"active": {USERS["A"]: True, USERS["B"]: True}, "redeemed": set(), "redeem_calls": 0}
@@ -51,8 +49,8 @@ class Hub(BaseHTTPRequestHandler):
                 and self.headers.get("X-Labs-Product") == "coc-control")
 
     def _ent(self, uid):
-        on = hub["active"].get(uid, False)
-        return {"product": "coc-control", "active": on, "accessUntil": until() if on else None}
+        active = hub["active"].get(uid, False)
+        return {"product": "coc-control", "active": active, "accessUntil": until() if active else None}
 
     def do_POST(self):
         if not self._authed():
@@ -66,8 +64,10 @@ class Hub(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "invalid_code"})
             hub["redeemed"].add(code)
             uid = USERS[who]
-            return self._send(200, {"user": {"id": uid, "email": f"{who.lower()}@teste.dev", "name": f"Líder {who}"},
-                                    "entitlement": self._ent(uid)})
+            return self._send(200, {
+                "user": {"id": uid, "email": f"{who.lower()}@teste.dev", "name": f"Líder {who}"},
+                "entitlement": self._ent(uid),
+            })
         self._send(404, {})
 
     def do_GET(self):
@@ -81,12 +81,14 @@ class Hub(BaseHTTPRequestHandler):
 srv = ThreadingHTTPServer(("127.0.0.1", 0), Hub)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 
-# ------------------------------------------------ banco no formato antigo (um usuário só)
 tmp = tempfile.mkdtemp()
 DB = os.path.join(tmp, "legado.db")
 os.environ.update({
-    "COC_DB": DB, "ADMIN_USER": "dono", "ADMIN_PASSWORD": "senha-do-dono-1",
-    "LABS_URL": "https://labs.example", "LABS_API_URL": f"http://127.0.0.1:{srv.server_address[1]}",
+    "COC_DB": DB,
+    "ADMIN_USER": "dono",
+    "ADMIN_PASSWORD": "senha-do-dono-1",
+    "LABS_URL": "https://labs.example",
+    "LABS_API_URL": f"http://127.0.0.1:{srv.server_address[1]}",
     "LABS_PRODUCT_SECRET": SECRET,
 })
 from coc import parser  # noqa: E402
@@ -117,7 +119,7 @@ legacy.execute("INSERT INTO settings VALUES ('api_key', ?)", (json.dumps(OLD_KEY
 legacy.commit()
 legacy.close()
 
-import app as A  # noqa: E402  (migra o banco ao importar)
+import app as A  # noqa: E402
 from coc import db, labs, netguard, notify  # noqa: E402
 
 print("[1] migração do banco de um usuário só")
@@ -133,12 +135,13 @@ check(st["telegram_chat_id"] == "999" and st["notify_enabled"] is True, "alertas
 check(st["supercell_token"] == "tok-do-dono", "chave da Supercell continua do servidor")
 check(con.execute("SELECT 1 FROM settings WHERE key='api_key'").fetchone() is None, "API key antiga não fica mais em texto")
 check(not con.execute("PRAGMA foreign_key_check").fetchall(), "referências íntegras")
+check(any(name.startswith("legado.db.pre-migration-") for name in os.listdir(tmp)), "backup automático criado antes da migração")
 new = db.create_account(con, owner, "Nova", tag="#NEW1")
 check(new["id"] > 9, "ids novos continuam depois dos antigos")
 db.delete_account(con, owner, new["id"])
 con.close()
 db._ready.discard(db.DB_PATH)
-con = db.connect()           # rodar de novo não migra de novo
+con = db.connect()
 check(con.execute("SELECT COUNT(*) FROM accounts").fetchone()[0] == 2, "migração idempotente")
 con.close()
 
@@ -147,24 +150,23 @@ state_of = lambda r: parse_qs(urlsplit(r.headers["Location"]).query)["state"][0]
 
 
 def csrf_of(resp):
-    for k, v in resp.headers:
-        if k == "Set-Cookie" and v.startswith("csrf="):
-            return v.split("=", 1)[1].split(";")[0]
+    for key, value in resp.headers:
+        if key == "Set-Cookie" and value.startswith("csrf="):
+            return value.split("=", 1)[1].split(";")[0]
     return None
 
 
 def enter(client, who, n):
-    r = client.get("/entrar/clash-labs")
-    assert r.status_code == 302 and r.headers["Location"].startswith("https://labs.example/app/coc-control?state=")
-    r = client.get(f"/api/labs/callback?code=good-{who}-{str(n).ljust(40, 'x')}&state={state_of(r)}")
-    return r
+    response = client.get("/entrar/clash-labs")
+    assert response.status_code == 302 and response.headers["Location"].startswith("https://labs.example/app/coc-control?state=")
+    return client.get(f"/api/labs/callback?code=good-{who}-{str(n).ljust(40, 'x')}&state={state_of(response)}")
 
 
 ca, cb, cx = A.app.test_client(), A.app.test_client(), A.app.test_client()
 calls = hub["redeem_calls"]
 r = ca.get(f"/api/labs/callback?code=good-A-{'z' * 40}")
 check(r.status_code == 302 and r.headers["Location"].endswith("/entrar/clash-labs") and hub["redeem_calls"] == calls,
-      "sem state (botão Abrir da vitrine): recomeça daqui e o código recebido não é trocado")
+      "sem state: recomeça daqui e o código recebido não é trocado")
 r1 = cx.get("/entrar/clash-labs")
 r = ca.get(f"/api/labs/callback?code=good-A-{'y' * 40}&state={state_of(r1)}")
 check("passe=expirou" in r.headers["Location"] and hub["redeem_calls"] == calls,
@@ -183,12 +185,13 @@ r = cz.get(f"/api/labs/callback?code=good-A-{'1'.ljust(40, 'x')}&state={st}")
 check("passe=erro" in r.headers["Location"], "código usado de novo é recusado pela vitrine")
 r = ca.get("/api/labs/callback?code=x&state=qualquer-coisa-1234")
 check("passe=expirou" in r.headers["Location"], "state já usado não vale de novo")
+check(labs.valid_labs_user_id(USERS["A"]) and not labs.valid_labs_user_id("usuario_qualquer"), "labs_user_id exige UUID canônico")
 con = db.connect()
 check(con.execute("SELECT COUNT(*) FROM users WHERE role='subscriber'").fetchone()[0] == 2, "entrar de novo não duplica o assinante")
 con.close()
 
 print("[3] cada assinante só vê as próprias vilas")
-H = lambda tok: {"X-CSRF": tok}  # noqa: E731
+H = lambda token: {"X-CSRF": token}  # noqa: E731
 raw = open(os.path.join(HERE, "fixture_real_th18.json")).read()
 ra = ca.post("/api/import", data=raw, content_type="application/json", headers=H(csrf_a))
 check(ra.status_code == 201, "assinante A importa a vila")
@@ -196,7 +199,7 @@ aid = ra.json["account"]["id"]
 rb = cb.post("/api/import", data=raw, content_type="application/json", headers=H(csrf_b))
 check(rb.status_code == 201 and rb.json["account"]["id"] != aid, "a mesma tag vira uma vila separada para B")
 bid = rb.json["account"]["id"]
-check([a["id"] for a in cb.get("/api/accounts").json] == [bid], "B lista só a vila dele (nem as do dono)")
+check([a["id"] for a in cb.get("/api/accounts").json] == [bid], "B lista só a vila dele")
 check([a["id"] for a in ca.get("/api/accounts").json] == [aid], "A lista só a vila dele")
 check(cb.get(f"/api/accounts/{aid}/detail").status_code == 404, "B não abre o detalhe da vila de A")
 check(cb.get(f"/api/accounts/{aid}/plan").status_code == 404, "B não vê o planner de A")
@@ -205,16 +208,16 @@ check(cb.patch(f"/api/accounts/{aid}", json={"name": "hackeada"}, headers=H(csrf
 check(cb.post(f"/api/accounts/{aid}/sync-supercell", headers=H(csrf_b)).status_code == 404, "B não sincroniza a vila de A")
 check(cb.post(f"/api/accounts/{aid}/verify", json={"token": "x"}, headers=H(csrf_b)).status_code == 404, "B não verifica a vila de A")
 sid = ca.get(f"/api/accounts/{aid}/detail").json["summary"]["snapshot_id"]
-check(cb.delete(f"/api/snapshots/{sid}", headers=H(csrf_b)).status_code == 404, "snapshot de outro usuário responde 404")
-check(cb.delete(f"/api/accounts/{aid}", headers=H(csrf_b)).status_code == 404, "vila de outro usuário responde 404")
+check(cb.delete(f"/api/snapshots/{sid}", headers=H(csrf_b)).status_code == 404, "B recebe 404 ao excluir snapshot de A")
+check(cb.delete(f"/api/accounts/{aid}", headers=H(csrf_b)).status_code == 404, "B recebe 404 ao excluir vila de A")
 d = ca.get(f"/api/accounts/{aid}/detail").json
-check(d["account"]["name"] != "hackeada" and d["summary"]["snapshot_id"] == sid, "exclusões de B não alcançam os dados de A")
+check(d["account"]["name"] != "hackeada" and d["summary"]["snapshot_id"] == sid, "tentativas de B não alteram dados de A")
 r = cb.post(f"/api/import?account_id={aid}", data=raw, content_type="application/json", headers=H(csrf_b))
-check(r.status_code == 404, "import com id de vila de outro usuário responde 404")
+check(r.status_code == 404, "import com account_id de outro usuário retorna 404")
 check(len(ca.get(f"/api/accounts/{aid}/detail").json["history"]) == 1, "vila de A continua com 1 snapshot")
 check(ca.post("/api/import", data=raw, content_type="application/json").status_code == 403, "sessão sem X-CSRF é bloqueada")
 
-print("[4] recursos do dono")
+print("[4] recursos do dono e suspensão manual")
 check(ca.post("/api/watcher", json={"enabled": True}, headers=H(csrf_a)).status_code == 403, "watcher do servidor é só do dono")
 check(ca.get("/api/status").json["watcher"]["available"] is False, "assinante usa o watcher do navegador")
 check(ca.get("/api/admin/subscribers").status_code == 403, "assinante não lista assinantes")
@@ -230,12 +233,25 @@ csrf_o = csrf_of(r)
 check(r.status_code == 200 and {a["id"] for a in co.get("/api/accounts").json} == {7, 9}, "dono entra com a senha e vê as vilas antigas")
 subs = co.get("/api/admin/subscribers").json
 check(sorted(s["email"] for s in subs) == ["a@teste.dev", "b@teste.dev"], "dono lista os assinantes")
-check(all("labs_user_id" not in s and "api_key_hash" not in s for s in subs), "lista sem ids internos nem hashes")
+check(all("api_key_hash" not in s for s in subs), "lista administrativa não expõe hashes de API key")
+sub_a = next(s for s in subs if s["email"] == "a@teste.dev")
+check(co.post(f"/api/admin/subscribers/{sub_a['id']}/suspension", json={"suspended": True, "reason": "suporte: revisão manual"}, headers=H(csrf_o)).status_code == 200,
+      "dono suspende assinante manualmente")
+check(ca.get("/api/accounts").status_code == 402 and ca.get("/api/me").json["suspended"], "suspensão manual bloqueia o painel")
+LH = {"Authorization": "Bearer " + SECRET, "X-Labs-Product": "coc-control"}
+check(A.app.test_client().post("/api/labs/webhook", json={"userId": USERS["A"]}, headers=LH).status_code == 200,
+      "webhook continua atualizando entitlement do suspenso")
+check(ca.get("/api/accounts").status_code == 402, "sincronização da Labs não desfaz suspensão manual")
+check(co.post(f"/api/admin/subscribers/{sub_a['id']}/suspension", json={"suspended": False}, headers=H(csrf_o)).status_code == 200,
+      "dono reativa assinante")
+check(ca.get("/api/accounts").status_code == 200, "reativação manual devolve acesso")
+check(co.post(f"/api/admin/subscribers/{sub_a['id']}/suspension", json={"suspended": True, "reason": "clash-labs: falso"}, headers=H(csrf_o)).status_code == 422,
+      "prefixo reservado clash-labs: não pode ser usado em suspensão manual")
 check(co.post("/api/import", data=raw, content_type="application/json",
               headers={"Authorization": "Bearer " + OLD_KEY}).json["account"]["user_id"] == owner,
       "API key antiga da automação continua valendo, para o dono")
 
-print("[5] API key por assinante")
+print("[5] API key e exportação por assinante")
 key_a = ca.post("/api/apikey", headers=H(csrf_a)).json["api_key"]
 bot = A.app.test_client()
 r = bot.post("/api/import", data=raw, content_type="application/json", headers={"Authorization": "Bearer " + key_a})
@@ -244,6 +260,10 @@ key_a2 = ca.post("/api/apikey", headers=H(csrf_a)).json["api_key"]
 check(bot.get("/api/accounts", headers={"Authorization": "Bearer " + key_a}).status_code == 401, "chave trocada deixa de valer")
 check(bot.get("/api/accounts", headers={"Authorization": "Bearer " + key_a2}).status_code == 200, "chave nova vale")
 check(ca.get("/api/me").json["api_key_hint"] == key_a2[-4:], "só o final da chave fica visível")
+exported = ca.get("/api/me/export")
+check(exported.status_code == 200 and exported.json["user"]["labs_user_id"] == USERS["A"], "assinante exporta os próprios dados")
+check("api_key_hash" not in exported.json["user"] and "supercell_token" not in str(exported.json), "exportação não revela segredos do servidor")
+check(co.delete("/api/me/data", headers=H(csrf_o)).status_code == 403, "conta do dono não pode ser apagada pela rota LGPD")
 
 print("[6] passe encerrado e renovado")
 wh = A.app.test_client()
@@ -253,23 +273,28 @@ check(wh.post("/api/labs/webhook", json=body, headers={"Authorization": "Bearer 
                                                         "X-Labs-Product": "coc-control"}).status_code == 401, "aviso com segredo errado é recusado")
 check(wh.post("/api/labs/webhook", json=body, headers={"Authorization": "Bearer " + SECRET,
                                                         "X-Labs-Product": "cla-command"}).status_code == 401, "aviso de outro produto é recusado")
-LH = {"Authorization": "Bearer " + SECRET, "X-Labs-Product": "coc-control"}
+original_hub = labs._hub
+
+def fail_hub(*args, **kwargs):
+    raise labs.LabsError("offline")
+
+labs._hub = fail_hub
+check(wh.post("/api/labs/webhook", json=body, headers=LH).status_code == 502, "falha ao reconferir entitlement responde 502")
+labs._hub = original_hub
 hub["active"][USERS["A"]] = False
 check(wh.post("/api/labs/webhook", json=body, headers=LH).status_code == 200, "aviso da vitrine aceito")
 r = ca.get("/api/accounts")
-check(r.status_code == 402 and r.json["passe"] == "inativo" and r.json["store"].startswith("https://labs.example"),
-      "passe encerrado: 402 com o caminho da renovação")
+check(r.status_code == 402 and r.json["passe"] == "inativo" and r.json["store"].startswith("https://labs.example"), "passe encerrado: 402 com caminho da renovação")
 check(bot.get("/api/accounts", headers={"Authorization": "Bearer " + key_a2}).status_code == 402, "API key do assinante também para")
 check(ca.get("/api/me").status_code == 200 and ca.get("/api/me").json["active"] is False, "ainda vê a própria conta para renovar")
+check(ca.get("/api/me/export").status_code == 200, "passe vencido ainda permite exportar dados próprios")
 check(cb.get("/api/accounts").status_code == 200, "o passe de A não afeta B")
 con = db.connect()
 check(USERS["A"] not in [u.get("labs_user_id") for u in db.users_to_notify(con, int(A.time.time()))], "sem passe, sem alertas")
 con.close()
 hub["active"][USERS["A"]] = True
 wh.post("/api/labs/webhook", json=body, headers=LH)
-check(ca.get("/api/accounts").status_code == 200 and len(ca.get(f"/api/accounts/{aid}/detail").json["history"]) == 2,
-      "renovou: volta com as vilas e o histórico intactos")
-# renovação cujo aviso se perdeu: o próprio pedido relê o passe
+check(ca.get("/api/accounts").status_code == 200 and len(ca.get(f"/api/accounts/{aid}/detail").json["history"]) == 2, "renovou: volta com vilas e histórico intactos")
 hub["active"][USERS["A"]] = False
 wh.post("/api/labs/webhook", json=body, headers=LH)
 hub["active"][USERS["A"]] = True
@@ -277,10 +302,9 @@ con = db.connect()
 con.execute("UPDATE users SET checked_at = checked_at - 3600 WHERE labs_user_id = ?", (USERS["A"],))
 con.commit()
 con.close()
-check(ca.get("/api/accounts").status_code == 200, "aviso perdido: o acesso volta ao abrir o painel")
+check(ca.get("/api/accounts").status_code == 200, "aviso perdido: acesso volta ao abrir o painel")
 check(wh.post("/api/labs/webhook", json={"userId": "../../etc"}, headers=LH).status_code == 422, "userId inválido é recusado")
-check(wh.post("/api/labs/webhook", json={"userId": "33333333-3333-4333-8333-333333333333"}, headers=LH).json == {"ok": True},
-      "aviso de quem não tem conta aqui é aceito sem revelar nada")
+check(wh.post("/api/labs/webhook", json={"userId": "33333333-3333-4333-8333-333333333333"}, headers=LH).json == {"ok": True}, "usuário desconhecido é aceito sem revelar existência")
 check(labs.access_until({"product": "coc-control", "active": True, "accessUntil": "2020-01-01T00:00:00Z"}) is None, "data passada não libera")
 check(labs.access_until({"product": "clashnato", "active": True, "accessUntil": until()}) is None, "passe de outro produto não libera")
 check(labs.access_until({"product": "coc-control", "active": True, "accessUntil": "amanhã"}) is None, "data inválida não libera")
@@ -313,8 +337,7 @@ r = ca.put("/api/settings", json={"telegram_token": "123456:" + "A" * 35, "teleg
 check(r.status_code == 200 and r.json["telegram_chat_id"] == "42", "canal válido é salvo")
 check(ca.put("/api/settings", json={"digest_time": "25:99"}, headers=H(csrf_a)).status_code == 422, "horário inválido é recusado")
 check(cb.get("/api/settings").json["telegram_chat_id"] == "", "configurações de A não aparecem para B")
-check(co.put("/api/settings", json={"evolution_url": "http://evolution:8080"}, headers=H(csrf_o)).status_code == 200,
-      "dono continua podendo usar a Evolution interna")
+check(co.put("/api/settings", json={"evolution_url": "http://evolution:8080"}, headers=H(csrf_o)).status_code == 200, "dono continua podendo usar a Evolution interna")
 sent = []
 notify.send_toast = lambda t, b: sent.append("toast") or True
 notify.send_evolution = lambda *a: sent.append("evolution") or True
@@ -332,11 +355,16 @@ con = db.connect()
 db.set_settings(con, db.get_user_by_labs(con, USERS["A"])["id"], {"notify_enabled": True, "digest_time": "00:00"})
 con.close()
 A.notifier.scan_once()
-check(("42", False) in seen, "resumo diário de A sai pelos canais de A, sem os privilégios do dono")
+check(("42", False) in seen, "resumo diário de A sai pelos canais de A, sem privilégios do dono")
 check(all(chat != "42" or trusted is False for chat, trusted in seen), "canais de A nunca recebem alertas como dono")
 
-print("[10] sair")
+print("[10] sair e exclusão própria")
 check(ca.post("/api/logout", headers=H(csrf_a)).status_code == 200 and ca.get("/api/accounts").status_code == 401, "logout encerra a sessão do assinante")
+check(cb.delete("/api/me/data", headers=H(csrf_b)).status_code == 200, "assinante pode excluir a própria conta e dados")
+con = db.connect()
+check(db.get_user_by_labs(con, USERS["B"]) is None, "exclusão própria remove o usuário")
+check(con.execute("SELECT 1 FROM access_audit WHERE event='data-deleted' AND detail='LGPD'").fetchone() is not None, "exclusão própria fica auditada")
+con.close()
 
 srv.shutdown()
 print(f"\n{ok} verificações passaram ✔")
