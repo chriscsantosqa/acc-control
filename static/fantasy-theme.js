@@ -6,29 +6,67 @@
   const isLogin = Boolean(document.querySelector('form.box#f')) || location.pathname.includes('login');
   body.classList.add(isLogin ? 'login-page' : 'dashboard-page');
 
-  /* Load the dedicated faceoff layer on every screen that already loads this theme. */
-  if (!document.querySelector('link[data-faceoff-theme]')) {
-    const faceoffCss = document.createElement('link');
+  /* Cache-safe critical faceoff styles. The complete visual rules still live in
+     faceoff-theme.css, but these rules guarantee that the two characters are
+     visible and never block interaction even if an older stylesheet is cached. */
+  if (!document.getElementById('faceoff-critical')) {
+    const critical = document.createElement('style');
+    critical.id = 'faceoff-critical';
+    critical.textContent = `
+      .faceoff-scene{position:fixed;inset:0;z-index:1;overflow:hidden;pointer-events:none!important;user-select:none}
+      .faceoff-scene *{pointer-events:none!important}
+      .faceoff-character{position:absolute;top:64px;z-index:1;width:clamp(340px,34vw,650px);height:calc(100vh - 64px);opacity:.42;display:flex;align-items:flex-start;justify-content:center;filter:drop-shadow(0 24px 55px rgba(0,0,0,.48));will-change:transform}
+      .faceoff-character img{display:block;width:100%;height:100%;object-fit:contain;object-position:center top}
+      .faceoff-platform .faceoff-left{left:clamp(255px,17vw,330px);transform:translate3d(var(--faceoff-left-x,0),var(--faceoff-left-y,0),0)}
+      .faceoff-platform .faceoff-right{right:-2vw;transform:translate3d(var(--faceoff-right-x,0),var(--faceoff-right-y,0),0) scaleX(-1)}
+      .faceoff-login .faceoff-character{top:66px;width:clamp(420px,38vw,720px);height:calc(100vh - 66px);opacity:.66}
+      .faceoff-login .faceoff-left{left:-3vw;transform:translate3d(var(--faceoff-left-x,0),var(--faceoff-left-y,0),0)}
+      .faceoff-login .faceoff-right{right:-3vw;transform:translate3d(var(--faceoff-right-x,0),var(--faceoff-right-y,0),0) scaleX(-1)}
+      .shell{position:relative;z-index:4}.login-page .box{position:relative;z-index:4}
+      .modal-bg{position:fixed!important;inset:0!important;z-index:1000!important}.modal-bg.open{display:flex!important}.modal{position:relative;z-index:1001}
+      @media(max-width:780px){.faceoff-scene{display:none}}
+    `;
+    document.head.appendChild(critical);
+  }
+
+  /* Load the full faceoff stylesheet with a new cache key. */
+  let faceoffCss = document.querySelector('link[data-faceoff-theme]');
+  if (!faceoffCss) {
+    faceoffCss = document.createElement('link');
     faceoffCss.rel = 'stylesheet';
-    faceoffCss.href = '/static/faceoff-theme.css?v=20260926-1';
     faceoffCss.dataset.faceoffTheme = '1';
     document.head.appendChild(faceoffCss);
   }
+  faceoffCss.href = '/static/faceoff-theme.css?v=20260926-5';
 
-  /* Characters are part of the global background, not interactive overlays. */
-  if (!document.querySelector('.faceoff-scene')) {
-    const faceoff = document.createElement('div');
+  /* Characters are a global background layer, never an interactive overlay. */
+  let faceoff = document.querySelector('.faceoff-scene');
+  if (!faceoff) {
+    faceoff = document.createElement('div');
     faceoff.className = `faceoff-scene ${isLogin ? 'faceoff-login' : 'faceoff-platform'}`;
     faceoff.setAttribute('aria-hidden', 'true');
-    faceoff.innerHTML = `
-      <div class="faceoff-character faceoff-left">
-        <img src="/static/assets/branding/soul-weaver.webp" alt="">
-      </div>
-      <div class="faceoff-character faceoff-right">
-        <img src="/static/assets/branding/void-archmage.webp" alt="">
-      </div>
-    `;
+
+    const left = document.createElement('div');
+    left.className = 'faceoff-character faceoff-left';
+    const leftImg = document.createElement('img');
+    leftImg.alt = '';
+    leftImg.decoding = 'async';
+    leftImg.src = '/static/assets/branding/soul-weaver.webp?v=20260926-5';
+    left.appendChild(leftImg);
+
+    const right = document.createElement('div');
+    right.className = 'faceoff-character faceoff-right';
+    const rightImg = document.createElement('img');
+    rightImg.alt = '';
+    rightImg.decoding = 'async';
+    rightImg.src = '/static/assets/branding/void-archmage.webp?v=20260926-5';
+    right.appendChild(rightImg);
+
+    faceoff.append(left, right);
     body.prepend(faceoff);
+
+    leftImg.addEventListener('error', () => console.error('Falha ao carregar soul-weaver.webp'));
+    rightImg.addEventListener('error', () => console.error('Falha ao carregar void-archmage.webp'));
   }
 
   /* Ambient FX remain separate from the character scene. */
