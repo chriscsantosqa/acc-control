@@ -1,44 +1,24 @@
-# Refatoração COC Control — execução e configuração
+# COC Control — Refatoração Clash Labs
 
-Esta versão mantém Flask + SQLite e evolui o COC Control para um painel de **Player/Village Intelligence**, usando a API oficial da Supercell para dados vivos do jogador e o export oficial/game data para progresso, custos, tempos e planejamento.
+Este documento descreve a configuração e execução da refatoração do COC Control, preservando o modo proprietário local e endurecendo o acesso de assinantes pela Clash Labs.
 
-> COC Control não é afiliado, endossado ou patrocinado pela Supercell.
+## 1. Pré-requisitos
 
-## 1. Branch e PR
+- Python 3.11+ recomendado.
+- `pip` e ambiente virtual.
+- SQLite disponível pelo Python.
+- Para integração com a API oficial do Clash of Clans: token de desenvolvedor da Supercell.
+- Para assinantes: acesso à Clash Labs e segredo compartilhado do produto `coc-control`.
+- Para importar o pacote visual `coc.rar`: `unrar`, `7z` ou `unar` quando o módulo Python `rarfile` não conseguir extrair sozinho.
 
-Branch da refatoração:
-
-```text
-refactor/clash-labs-player-intelligence
-```
-
-Para testar antes do merge:
-
-```bash
-git fetch origin
-git checkout refactor/clash-labs-player-intelligence
-```
-
-## 2. Requisitos
-
-- Python 3.11+ para execução local.
-- Docker + Docker Compose recomendado para VPS/produção.
-- Token de desenvolvedor da API oficial do Clash of Clans para sincronização do jogador.
-- Proxy reverso HTTPS recomendado em produção.
-
-## 3. Instalação local
-
-Crie o ambiente virtual e instale as dependências:
+## 2. Instalação local
 
 ```bash
+git clone https://github.com/chriscsantosqa/acc-control.git
+cd acc-control
+git checkout refactor/coc-control-clash-labs
+
 python -m venv .venv
-```
-
-Linux/macOS:
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
 ```
 
 Windows PowerShell:
@@ -46,314 +26,227 @@ Windows PowerShell:
 ```powershell
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
-
-### Variáveis no modo local
-
-O `app.py` lê as variáveis do **ambiente do processo**. Copiar `.env.example` para `.env` sozinho não faz o Python carregar esse arquivo.
-
-No modo local você pode:
-
-1. definir as variáveis no terminal/sistema operacional; ou
-2. usar Docker Compose, que já possui `env_file: .env`.
-
-Exemplo PowerShell para uma execução local simples:
-
-```powershell
-$env:ADMIN_USER="chris"
-$env:ADMIN_PASSWORD="troque-esta-senha"
-$env:SECRET_KEY="SEGREDO_ALEATORIO"
-python app.py --no-watcher --no-browser
-```
-
-Sem configuração de login, o comportamento local existente pode continuar sem autenticação do dono, conforme a configuração atual da aplicação.
-
-## 4. Arquivo `.env` para Docker Compose / produção
-
-Crie a partir do exemplo:
 
 Linux/macOS:
 
 ```bash
+source .venv/bin/activate
+pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Windows PowerShell:
+## 3. Variáveis de ambiente
 
-```powershell
-Copy-Item .env.example .env
-```
-
-Configuração principal:
+Configuração mínima do proprietário:
 
 ```env
 ADMIN_USER=chris
 ADMIN_PASSWORD_HASH=
 SECRET_KEY=
+COC_HTTPS=0
+COC_BEHIND_PROXY=0
 TZ=America/Sao_Paulo
-
-# Produção atrás de HTTPS/proxy confiável
-COC_HTTPS=1
-COC_BEHIND_PROXY=1
-
-# Clash Labs
-LABS_URL=https://SEU-DOMINIO-CLASH-LABS
-LABS_API_URL=https://SEU-ENDERECO-DE-API-CLASH-LABS
-LABS_PRODUCT_SECRET=SEGREDO_COM_32_OU_MAIS_CARACTERES
-LABS_SYNC_INTERVAL=900
-
-# Limites dos assinantes
-COC_MAX_ACCOUNTS=20
-COC_MAX_SNAPSHOTS=150
 ```
 
-Gere o hash da senha do dono com:
-
-```bash
-python tools/hash_password.py
-```
-
-Gere uma `SECRET_KEY` com:
+Gere a chave de sessão:
 
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-`COC_HTTPS=1` deve ser usado quando a URL pública realmente estiver em HTTPS, pois o cookie de sessão passa a usar `Secure`.
+Gere o hash da senha usando o utilitário já existente no projeto:
 
-`COC_BEHIND_PROXY=1` deve ser usado somente atrás de proxy reverso confiável.
-
-## 5. Clash Labs
-
-Produto:
-
-```text
-coc-control
+```bash
+python tools/hash_password.py
 ```
 
-Fluxo:
+### Integração Clash Labs
 
-- entrada: `GET /entrar/clash-labs`;
-- callback: `GET /api/labs/callback`;
-- webhook: `POST /api/labs/webhook`;
-- vínculo: somente `labs_user_id` UUID, nunca e-mail;
-- `state`: ligado à sessão do navegador, uso único, TTL de 10 minutos;
-- passe válido: produto correto + `active=true` + `accessUntil` futuro com timezone;
-- passe vencido: rotas das vilas retornam `402`, mas os dados permanecem preservados;
-- suspensão manual do dono é independente da Clash Labs e não é revertida pelo sync.
+```env
+LABS_URL=https://seu-dominio-clash-labs
+LABS_API_URL=https://seu-dominio-clash-labs
+LABS_PRODUCT_SECRET=SEGREDO_COM_PELO_MENOS_32_CARACTERES
+LABS_SYNC_INTERVAL=900
+COC_MAX_ACCOUNTS=20
+COC_MAX_SNAPSHOTS=150
+```
 
-Headers do webhook:
+`LABS_PRODUCT_SECRET` deve ser o mesmo segredo configurado para o produto `coc-control` na Clash Labs. Ele nunca deve ser enviado ao navegador ou salvo em JavaScript.
 
-```http
+Gerador sugerido:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+## 4. Contrato SSO
+
+Fluxo esperado:
+
+1. O usuário acessa `/entrar/clash-labs`.
+2. O COC Control cria `state` aleatório preso à sessão do navegador.
+3. O navegador é enviado para `/app/coc-control?state=<state>&volta=%2F` na Clash Labs.
+4. A Clash Labs retorna para `/api/labs/callback?code=<code>&state=<state>`.
+5. O COC Control valida o `state`, que expira em 10 minutos e só pode ser usado uma vez.
+6. O backend troca o `code` em `/api/v1/sso/redeem` usando `LABS_PRODUCT_SECRET`.
+7. O usuário é vinculado somente pelo `labs_user_id` UUID. E-mail nunca é usado para vínculo de identidade.
+8. O acesso só é considerado ativo quando o entitlement pertence ao produto `coc-control`, está ativo e possui `accessUntil` futuro com timezone.
+
+Quando o callback chega sem `state`, o código recebido não é trocado: uma nova rodada SSO é iniciada.
+
+## 5. Webhook de entitlement
+
+Endpoint:
+
+```text
+POST /api/labs/webhook
+```
+
+Cabeçalhos:
+
+```text
 Authorization: Bearer <LABS_PRODUCT_SECRET>
 X-Labs-Product: coc-control
 Content-Type: application/json
 ```
 
-Body:
+Payload:
 
 ```json
 {
-  "userId": "11111111-1111-4111-8111-111111111111"
+  "userId": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-Respostas relevantes:
+Comportamento esperado:
 
-- segredo/produto inválido: `401`;
-- `userId` malformado: `422`;
-- usuário ainda inexistente localmente: `200`;
-- falha ao reconferir entitlement na central: `502`.
+- segredo incorreto: `401`;
+- produto incorreto: `401`;
+- `userId` fora do formato UUID: `422`;
+- usuário ainda não existente no COC Control: `200` sem revelar a ausência;
+- indisponibilidade da Clash Labs durante a releitura do entitlement: `502`;
+- sucesso: `200`.
 
-Na Clash Labs, o segredo configurado para o produto deve ser exatamente o mesmo valor de `LABS_PRODUCT_SECRET`, e a URL do produto deve apontar para a URL pública HTTPS do COC Control.
+## 6. Importação dos assets do Clash of Clans
 
-## 6. API oficial da Supercell
+O repositório não precisa depender de CDN para os assets fornecidos no pacote local.
 
-O token de desenvolvedor da Supercell permanece uma configuração global do servidor e somente o dono pode alterá-lo.
+Execute:
 
-Passos:
+```bash
+python tools/import_coc_assets.py /caminho/para/coc.rar
+```
 
-1. entre no COC Control como dono;
-2. abra **Configurações**;
-3. informe o **Token de desenvolvedor Supercell**;
-4. salve;
-5. cadastre uma vila com a tag do jogador;
-6. use **Sincronizar** no jogador ou **Sincronizar todas**.
+No Windows:
 
-A Player API alimenta nome, tag, Centro de Vila, liga, troféus, clã, estatísticas e Arsenal. O export oficial continua responsável pelo progresso detalhado, timers, custos, filas e ETAs.
+```powershell
+python tools\import_coc_assets.py C:\caminho\coc.rar
+```
 
-## 7. Assets locais
-
-O PR já versiona **686 assets** em:
+Destino:
 
 ```text
 static/assets/coc/
 ```
 
-O pacote inclui, entre outros:
+O script também gera:
 
 ```text
-static/assets/coc/buildings/
-static/assets/coc/townhall/
-static/assets/coc/heroes/
-static/assets/coc/equipment/
-static/assets/coc/troops/
-static/assets/coc/spells/
-static/assets/coc/pets/
-static/assets/coc/resources/
-static/assets/coc/icons/
-static/assets/coc/leagues/
+static/assets/coc/assets-manifest.json
 ```
 
-Os arquivos de licença/proveniência do pacote foram preservados.
+Arquivos de licença e proveniência presentes no pacote são preservados. O pacote analisado contém heróis, tropas, feitiços, pets, equipamentos, Town Halls, recursos, ícones e ligas. Não foi identificada uma coleção dedicada de imagens para todas as construções; nesses casos a interface deve manter fallback visual em vez de inventar arquivos ausentes.
 
-Para futuras atualizações a partir de outro `coc.rar`:
+## 7. API oficial da Supercell
+
+A chave de desenvolvedor da Supercell continua sendo configuração de servidor/proprietário. O COC Control utiliza a Player API para enriquecer os dados de cada vila, incluindo informações disponíveis de heróis, tropas, feitiços, equipamentos, liga, troféus, doações, guerra e demais campos retornados oficialmente.
+
+A importação JSON da vila continua sendo a fonte para progresso, timers, custos, recursos e planejamento quando essas informações não existem na Player API pública.
+
+## 8. Execução
+
+Servidor padrão:
 
 ```bash
-python tools/import_coc_assets.py /caminho/para/coc.rar --repo .
+python app.py
 ```
 
-O importador aceita um extrator RAR disponível no sistema, como 7-Zip, `unar`, `bsdtar` ou `unrar`.
-
-## 8. Banco SQLite e migration
-
-Em Docker o banco fica persistido fora da imagem em:
-
-```text
-/data/coc_control.db
-```
-
-Antes de uma alteração necessária de schema em banco existente, a aplicação cria um backup consistente com o padrão:
-
-```text
-coc_control.db.pre-migration-YYYYMMDD-HHMMSS.bak
-```
-
-A migration:
-
-- preserva IDs das vilas legadas;
-- preserva snapshots e estatísticas;
-- mantém as vilas existentes vinculadas ao dono;
-- preserva as configurações do dono;
-- migra a API key legada sem mantê-la em texto puro;
-- adiciona suspensão manual e `access_audit`;
-- é idempotente.
-
-Mantenha também backup externo/volume snapshot antes do primeiro deploy em produção.
-
-## 9. Privacidade e isolamento
-
-- cada vila pertence a um `user_id`;
-- ID de vila/snapshot de outro usuário retorna `404`;
-- assinantes não recebem o token global da Supercell;
-- API key é armazenada como hash;
-- `GET /api/me/export` exporta os próprios dados sem hash da API key ou segredo global da Supercell;
-- `DELETE /api/me/data` exclui a conta e dados próprios do assinante;
-- a conta do dono não pode ser excluída por essa rota;
-- mutações por sessão exigem CSRF;
-- cookie da sessão é `HttpOnly`;
-- URLs configuráveis por assinante continuam protegidas contra SSRF e devem ser públicas/HTTPS;
-- assinante suspenso manualmente não recebe notificações.
-
-## 10. Testes e CI
-
-O PR inclui:
-
-```text
-.github/workflows/coc-control-tests.yml
-```
-
-O workflow executa:
+Sem watcher de clipboard:
 
 ```bash
-python -m py_compile app.py coc/*.py tools/import_coc_assets.py tests/test_contract_refactor.py
-python tests/test_auth.py
-python tests/test_basic.py
-python tests/test_features.py
-python tests/test_matcher.py
-python tests/test_sync_all.py
-python tests/test_multiuser.py
-python tests/test_contract_refactor.py
+python app.py --no-watcher
 ```
 
-A suíte cobre migration legada, SSO/state, UUID, isolamento, `404` cross-tenant, CSRF, API key, suspensão/reativação manual, webhook `401/422/502`, expiração/renovação, limites, SSRF, exportação e exclusão própria.
-
-## 11. Execução local
-
-Com as variáveis necessárias já definidas no ambiente:
-
-```bash
-python app.py --no-watcher --no-browser
-```
-
-Endereço padrão:
+Abra:
 
 ```text
 http://127.0.0.1:8420
 ```
 
-Para manter o watcher local do clipboard, remova `--no-watcher`.
+Em VPS com HTTPS e proxy reverso:
 
-## 12. Execução recomendada com Docker Compose
-
-O `docker-compose.yml` já usa:
-
-```yaml
-env_file: .env
+```env
+COC_HTTPS=1
+COC_BEHIND_PROXY=1
 ```
 
-Suba/reconstrua:
+O proxy deve terminar TLS e encaminhar para a porta interna do COC Control.
+
+## 9. Testes
+
+Execute todos os testes:
 
 ```bash
-docker compose up -d --build
+pytest -q
 ```
 
-Acompanhe:
+Somente o contrato Clash Labs:
 
 ```bash
-docker compose logs -f coc-control
+pytest -q tests/test_labs_contract.py tests/test_multiuser.py
 ```
 
-Valide o healthcheck:
+Os testes de segurança devem cobrir, no mínimo:
 
-```bash
-curl http://127.0.0.1:8420/api/health
-```
+- state correto;
+- state ausente;
+- state reutilizado;
+- state de outro navegador;
+- UUID inválido;
+- webhook com segredo/produto inválidos;
+- entitlement expirado e renovado;
+- isolamento entre usuários;
+- migração de banco antigo sem perda de dados.
 
-Resposta esperada:
+## 10. Checklist antes de produção
 
-```json
-{"ok":true}
-```
+1. Fazer backup de `coc_control.db`.
+2. Configurar `SECRET_KEY` forte.
+3. Configurar `ADMIN_PASSWORD_HASH`.
+4. Configurar `LABS_URL`, `LABS_API_URL` e `LABS_PRODUCT_SECRET`.
+5. Ativar `COC_HTTPS=1` somente atrás de HTTPS real.
+6. Importar os assets locais do `coc.rar`.
+7. Configurar o token oficial da Supercell pela área administrativa.
+8. Executar `pytest -q`.
+9. Validar login do proprietário.
+10. Validar SSO de assinante em navegador separado.
+11. Validar renovação/expiração via webhook.
+12. Conferir que assinantes não conseguem acessar IDs de vilas/snapshots de outros usuários.
 
-O container executa o app em produção na porta `8420`, com banco persistente no volume `coc_data`.
+## 11. Segurança aplicada nesta alteração
 
-## 13. Produção com proxy reverso
+- identificação Clash Labs limitada a UUID canônico;
+- state SSO com TTL de 10 minutos e uso único;
+- comparação do segredo em tempo constante;
+- sem vínculo por e-mail;
+- redirects HTTP da central desabilitados;
+- entitlement validado por produto, status e data futura com timezone;
+- falha de upstream no webhook representada como `502`;
+- assets servidos localmente pelo projeto, sem necessidade de CDN externa;
+- segredo da Clash Labs permanece exclusivamente no backend.
 
-Recomendações:
+## 12. Aviso
 
-1. publique atrás de Nginx, Traefik ou Caddy com HTTPS;
-2. defina `COC_HTTPS=1`;
-3. mantenha `COC_BEHIND_PROXY=1` apenas atrás do proxy confiável;
-4. não exponha `.env` nem o arquivo SQLite;
-5. mantenha `LABS_PRODUCT_SECRET` somente nos servidores envolvidos;
-6. restrinja permissões do volume/banco;
-7. faça backup externo antes do primeiro deploy desta versão.
-
-Se usar Traefik/rede externa, adapte a seção já comentada no `docker-compose.yml`, expondo internamente a porta `8420` para o proxy.
-
-## 14. Checklist pós-deploy
-
-1. `GET /api/health` retorna `200` e `{ "ok": true }`.
-2. Login do dono funciona.
-3. Token da Supercell está configurado.
-4. Uma vila sincroniza pela Player API.
-5. Importação do JSON oficial gera snapshot, progresso, custos e ETA.
-6. Arsenal e assets locais são exibidos.
-7. SSO Clash Labs cria um assinante separado.
-8. Assinante A não acessa IDs do assinante B (`404`).
-9. Suspensão manual bloqueia o assinante, interrompe alertas e não é revertida pelo webhook/sync.
-10. Expiração do passe retorna `402` sem apagar dados.
-11. Renovação recupera as mesmas vilas e histórico.
-12. Exportação dos próprios dados não contém segredos do servidor.
-13. Canais de notificação permanecem isolados por usuário.
+COC Control é uma ferramenta independente e não é afiliada, endossada ou patrocinada pela Supercell.
