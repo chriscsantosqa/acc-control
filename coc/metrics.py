@@ -12,7 +12,7 @@ LAB_QUEUE={"troop","spell","siege"}
 PET_QUEUE={"pet"}
 BB_BUILDER_QUEUE={"bb-builder-hall","bb-defense","bb-trap","bb-resource","bb-army","bb-other","bb-hero"}
 BB_LAB_QUEUE={"bb-troop"}
-HELPER_IDS={"builders-apprentice","lab-assistant","prospector"}
+HELPER_IDS={"builders-apprentice","lab-assistant","alchemist","prospector"}
 BOB_HUT_NAMES={"bobs-hut"}
 MERGE_CREDITS={1000085:(1000008,2),1000084:(1000009,2),1000102:(1000011,2)}
 
