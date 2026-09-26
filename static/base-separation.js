@@ -71,7 +71,7 @@ gameAsset = function(category, name, level = 1, baseHint = null) {
     return catalogAsset('traps', name, {base: manifestBase(base), level});
   }
   if (['defense','resource','army','townhall','wall','other','bb-defense','bb-resource','bb-army','bb-builder-hall','bb-wall','bb-other'].includes(cat)) {
-    if (['builders-apprentice','lab-assistant','prospector'].includes(slug(name))) {
+    if (['builders-apprentice','lab-assistant','prospector','alchemist'].includes(slug(name))) {
       return catalogAsset('helpers', name, {level});
     }
     return catalogAsset('buildings', name, {base: manifestBase(base), level});
@@ -159,13 +159,13 @@ function inventorySets(base) {
   return out;
 }
 function apiCards(items, kind) {
-  return (items || []).map(item => `<div class="card unit ${item.maxLevel && item.level >= item.maxLevel ? 'max' : ''}">
-    ${image(asset(kind, item.name), '', '◈')}<div class="lvl">${item.level ?? '—'}${item.maxLevel ? ' / ' + item.maxLevel : ''}</div><b>${esc(item.name)}</b>
+  return (items || []).map(item => `<div class="card unit ${item.maxLevel && item.level >= item.maxLevel ? 'max' : ''}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;min-height:154px;overflow:hidden">
+    ${image(asset(kind, item.name), '', '◈')}<div class="lvl">${item.level ?? '—'}${item.maxLevel ? ' / ' + item.maxLevel : ''}</div><b style="display:block;width:100%;margin-top:8px;line-height:1.2;overflow-wrap:anywhere">${esc(item.name)}</b>
   </div>`).join('') || '<span class="small">Sem dados</span>';
 }
 function inventoryCards(items, base) {
-  return (items || []).map(item => `<div class="card unit">
-    ${image(gameAsset(item.category, item.name, item.lvl, base), '', '◈')}<div class="lvl">Nv ${item.lvl ?? '—'}</div><b>${esc(item.name)}</b><div class="small">${item.cnt > 1 ? `${item.cnt} unidades` : ''}</div>
+  return (items || []).map(item => `<div class="card unit" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;min-height:154px;overflow:hidden">
+    ${image(gameAsset(item.category, item.name, item.lvl, base), '', '◈')}<div class="lvl">Nv ${item.lvl ?? '—'}</div><b style="display:block;width:100%;margin-top:8px;line-height:1.2;overflow-wrap:anywhere">${esc(item.name)}</b><div class="small" style="display:block;width:100%;margin-top:4px">${item.cnt > 1 ? `${item.cnt} unidades` : ''}</div>
   </div>`).join('') || '<span class="small">Sem dados no último JSON.</span>';
 }
 function arsenalSection(title, html, count) {
