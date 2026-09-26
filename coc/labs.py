@@ -1,30 +1,19 @@
-"""
-Passe do COC Control vendido na Clash Labs.
+"""Integração do passe do COC Control com a Clash Labs.
 
-Cada assinante tem a própria conta aqui, com as próprias vilas e alertas. Ninguém
-cria senha no COC Control: o assinante entra pela Clash Labs.
-
-Entrada (parecido com OAuth):
-  1. GET /entrar/clash-labs     -> guarda um `state` na sessão deste navegador e manda
-                                   para <LABS_URL>/app/coc-control?state=...
-  2. a vitrine confere login e passe e volta para /api/labs/callback?code=...&state=...
-  3. o servidor confere o `state` com a sessão e troca o código com LABS_PRODUCT_SECRET.
-Quem chega da vitrine sem `state` (botão Abrir) volta para o passo 1: o código dele nunca
-é trocado, então um link com o código de outra pessoa não faz ninguém entrar na conta errada.
-
-O passe muda (pagamento, renovação, cancelamento, reembolso): a vitrine avisa em
-POST /api/labs/webhook {userId}; o aviso só diz quem mudou, e o passe é relido aqui.
-O Notifier também relê periodicamente quem está sem conferência recente.
-
-Desligado enquanto LABS_URL e LABS_PRODUCT_SECRET (32+ caracteres) não estão no .env.
+Regras principais:
+- vínculo exclusivamente por ``labs_user_id`` UUID;
+- state de navegador com 10 minutos e uso único;
+- segredo somente servidor a servidor;
+- entitlement sempre validado para ``coc-control``;
+- webhook relê o entitlement na origem em vez de confiar no payload.
 """
 import datetime as _dt
 import hashlib
 import hmac
 import os
-import re
 import secrets
 import time
+import uuid
 
 try:
     import requests
@@ -35,7 +24,6 @@ from . import db
 
 PRODUCT = "coc-control"
 STATE_TTL_S = 600
-LABS_USER_ID = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 
 
 def _env():
@@ -60,23 +48,51 @@ def account_url():
 
 
 class LabsError(Exception):
-    pass
+    """Falha de comunicação/contrato com a Clash Labs."""
+
+
+def valid_labs_user_id(value):
+    """Aceita somente UUID canônico. Nunca usa e-mail como identidade."""
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = uuid.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return False
+    return str(parsed) == value.lower()
 
 
 def _hub(path, method="GET", body=None):
     if not requests:
         raise LabsError("pacote 'requests' não instalado")
     _, api, secret = _env()
-    r = requests.request(method, f"{api}{path}", json=body, timeout=8, allow_redirects=False,
-                         headers={"Authorization": f"Bearer {secret}", "X-Labs-Product": PRODUCT,
-                                  "Accept": "application/json"})
+    if not api or len(secret) < 32:
+        raise LabsError("integração Clash Labs não configurada")
+    try:
+        r = requests.request(
+            method,
+            f"{api}{path}",
+            json=body,
+            timeout=8,
+            allow_redirects=False,
+            headers={
+                "Authorization": f"Bearer {secret}",
+                "X-Labs-Product": PRODUCT,
+                "Accept": "application/json",
+            },
+        )
+    except Exception as exc:
+        raise LabsError("não foi possível consultar a Clash Labs") from exc
     if r.status_code != 200:
         raise LabsError(f"Clash Labs respondeu {r.status_code}")
-    return r.json()
+    try:
+        return r.json()
+    except Exception as exc:
+        raise LabsError("resposta inválida da Clash Labs") from exc
 
 
 def access_until(ent, now=None):
-    """Epoch até quando o passe vale, ou None se não vale (outro produto, inativo, data inválida ou passada)."""
+    """Epoch até quando o passe vale ou ``None`` quando o entitlement não vale."""
     now = now or time.time()
     if not isinstance(ent, dict) or ent.get("product") != PRODUCT or ent.get("active") is not True:
         return None
@@ -89,8 +105,8 @@ def access_until(ent, now=None):
         return None
     if ts.tzinfo is None:
         return None
-    ts = int(ts.timestamp())
-    return ts if ts > now else None
+    value = int(ts.timestamp())
+    return value if value > now else None
 
 
 def has_access(user, now=None):
@@ -98,12 +114,16 @@ def has_access(user, now=None):
         return False
     if user["role"] == "owner":
         return True
+    # Campos opcionais para bancos que já receberam a migração de suspensão manual.
+    # A sincronização de entitlement nunca deve reativar uma suspensão operacional.
+    if user.get("suspended_at"):
+        return False
     return bool(user.get("access_until") and user["access_until"] > (now or time.time()))
 
 
 # ---------------------------------------------------------------- entrada
 def begin(session):
-    """Passo 1: cria o state, guarda na sessão deste navegador e devolve a URL da vitrine."""
+    """Cria o state e devolve a URL da vitrine. O state fica preso à sessão do navegador."""
     url, _, _ = _env()
     state = secrets.token_urlsafe(24)
     session["labs_state"] = state
@@ -112,53 +132,66 @@ def begin(session):
 
 
 def take_state(session, state):
-    """Passo 3: o state confere com o deste navegador? Uso único."""
+    """Confere state com tempo constante. O valor é consumido mesmo quando inválido."""
     expected = session.pop("labs_state", None)
     started = session.pop("labs_state_at", 0)
     if not (isinstance(state, str) and isinstance(expected, str)):
         return False
-    if time.time() - started > STATE_TTL_S:
+    if not isinstance(started, (int, float)) or time.time() - started > STATE_TTL_S:
         return False
     return hmac.compare_digest(state.encode(), expected.encode())
 
 
 def redeem(con, code):
-    """Troca o código e grava o assinante. Devolve o usuário (com access_until atualizado) ou None."""
+    """Troca código SSO e grava o assinante. Falhas de SSO não expõem detalhes ao navegador."""
     if not isinstance(code, str) or not 40 <= len(code) <= 64:
         return None
     try:
         out = _hub("/api/v1/sso/redeem", "POST", {"code": code})
-    except Exception:
+    except LabsError:
         return None
     u = (out or {}).get("user") or {}
     ent = (out or {}).get("entitlement") or {}
-    if not isinstance(u.get("id"), str) or not LABS_USER_ID.match(u["id"]) or ent.get("product") != PRODUCT:
+    if not valid_labs_user_id(u.get("id")) or ent.get("product") != PRODUCT:
         return None
-    user = db.upsert_labs_user(con, u["id"], str(u.get("email") or "")[:200], str(u.get("name") or "")[:120])
+    user = db.upsert_labs_user(
+        con,
+        u["id"].lower(),
+        str(u.get("email") or "")[:200],
+        str(u.get("name") or "")[:120],
+    )
     db.set_access(con, user["id"], access_until(ent))
     return db.get_user(con, user["id"])
 
 
 # ---------------------------------------------------------------- mudanças no passe
-def refresh(con, user):
-    """Relê o passe na vitrine. Devolve o usuário atualizado; em falha de rede, o de antes."""
+def refresh(con, user, strict=False):
+    """Relê o entitlement.
+
+    Em navegação comum preserva o último estado se a central estiver indisponível.
+    No webhook ``strict=True`` para que a rota possa devolver 502 e solicitar retry.
+    """
     if not enabled() or not user or user["role"] != "subscriber" or not user.get("labs_user_id"):
         return user
     try:
         ent = _hub(f"/api/v1/entitlements/{user['labs_user_id']}")
-    except Exception:
+    except LabsError:
+        if strict:
+            raise
         return user
     db.set_access(con, user["id"], access_until(ent))
     return db.get_user(con, user["id"])
 
 
 def refresh_labs_user(con, labs_user_id):
-    """Aviso da vitrine. Quem não tem conta aqui é ignorado, sem dizer isso a quem chamou."""
-    if not isinstance(labs_user_id, str) or not LABS_USER_ID.match(labs_user_id):
+    """Webhook da vitrine: UUID inválido = 422; usuário desconhecido = 200 sem vazamento."""
+    if not valid_labs_user_id(labs_user_id):
         raise ValueError("userId inválido")
-    user = db.get_user_by_labs(con, labs_user_id)
+    canonical = labs_user_id.lower()
+    user = db.get_user_by_labs(con, canonical)
     if user:
-        refresh(con, user)
+        return refresh(con, user, strict=True)
+    return None
 
 
 def sync_due(con, now=None):
@@ -171,9 +204,12 @@ def sync_due(con, now=None):
 
 
 def is_from_labs(authorization, product):
-    """Pedido com o segredo deste produto? Comparação em tempo constante (sobre os hashes, que têm o mesmo tamanho)."""
+    """Valida segredo do produto em tempo constante."""
     if not enabled() or product != PRODUCT or not isinstance(authorization, str):
         return False
     _, _, secret = _env()
-    digest = lambda v: hashlib.sha256(v.encode()).digest()  # noqa: E731
+
+    def digest(value):
+        return hashlib.sha256(value.encode()).digest()
+
     return hmac.compare_digest(digest(authorization), digest(f"Bearer {secret}"))
