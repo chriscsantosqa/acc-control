@@ -288,3 +288,48 @@ backup em `/opt/coc-control/backups` antes de cada atualização).
 
 Projeto pessoal não afiliado à Supercell. Usa apenas dados que o próprio jogo
 exporta, conforme a [Fan Content Policy](https://www.supercell.com/fan-content-policy).
+
+## Player Intelligence — interface refatorada
+
+O detalhe de cada vila combina duas fontes, sem misturar responsabilidades:
+
+- **API oficial da Supercell:** identidade do jogador, CV, liga, troféus, clã, heróis, equipamentos, tropas e feitiços;
+- **export oficial em JSON + `data/game_data.json`:** níveis reais do export, timers, progresso, custos restantes, minérios, disponibilidade de construtores, laboratório/pets e projeções do planner.
+
+A navegação da vila foi organizada em **Visão geral**, **Arsenal**, **Upgrades**, **Planejador** e **Histórico**. Os assets são servidos localmente por `static/assets/coc`; o build da refatoração importa o catálogo aberto ClashKingAssets e mantém a atribuição/licença junto aos arquivos.
+
+### Privacidade e administração
+
+- `GET /api/me/export`: exporta os dados do próprio usuário em JSON sem hash da API key nem token global da Supercell.
+- `DELETE /api/me/data`: assinante exclui a própria conta e os dados de domínio; a conta do dono não pode ser removida por essa rota.
+- `POST /api/admin/subscribers/<id>/suspension`: o dono suspende/reativa um assinante manualmente. A sincronização da Clash Labs não remove uma suspensão manual.
+- Mudanças de acesso são registradas em `access_audit`.
+- Antes de uma migração de schema em banco existente, é criado `coc_control.db.pre-migration-YYYYMMDD-HHMMSS.bak`.
+
+### Variáveis Clash Labs
+
+```env
+LABS_URL=https://clashlabs.seudominio.com
+LABS_API_URL=http://clash-labs:porta        # opcional; padrão = LABS_URL
+LABS_PRODUCT_SECRET=gere-um-segredo-de-48-ou-mais-caracteres
+LABS_SYNC_INTERVAL=900
+COC_MAX_ACCOUNTS=20
+COC_MAX_SNAPSHOTS=150
+```
+
+A integração só é ativada com `LABS_URL` e `LABS_PRODUCT_SECRET` com pelo menos 32 caracteres. Para produção, use 48+ caracteres.
+
+### Validação antes do deploy
+
+```bash
+python tests/test_auth.py
+python tests/test_basic.py
+python tests/test_features.py
+python tests/test_matcher.py
+python tests/test_sync_all.py
+python tests/test_multiuser.py
+python tests/test_contract_refactor.py
+```
+
+Depois suba normalmente com Docker/Compose ou pelo fluxo `Deploy VPS.bat` já existente. O banco SQLite deve continuar montado em `/data`; nunca embuta o `.env` nem o banco na imagem.
+

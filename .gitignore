@@ -1,0 +1,8 @@
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.pre-migration-*.bak
+__pycache__/
+*.pyc

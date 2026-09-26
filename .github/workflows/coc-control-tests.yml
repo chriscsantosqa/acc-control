@@ -1,0 +1,47 @@
+name: COC Control Tests
+
+on:
+  push:
+    branches:
+      - refactor/clash-labs-player-intelligence
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile backend
+        run: |
+          python -m py_compile app.py coc/*.py tools/import_coc_assets.py tests/test_contract_refactor.py
+
+      - name: Run regression suite
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python tests/test_auth.py
+          python tests/test_basic.py
+          python tests/test_features.py
+          python tests/test_matcher.py
+          python tests/test_sync_all.py
+          python tests/test_multiuser.py
+          python tests/test_contract_refactor.py
