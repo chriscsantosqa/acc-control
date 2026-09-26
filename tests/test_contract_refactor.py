@@ -77,6 +77,7 @@ snapshot = {
         {"data": data_id("town-hall"), "lvl": 18, "cnt": 1, "timer": None, "known": True, "ignored": False},
         {"data": data_id("builders-apprentice"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
         {"data": data_id("lab-assistant"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
+        {"data": data_id("alchemist"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
         {"data": data_id_by_name("Builder Hall", "builder"), "lvl": 6, "cnt": 1, "timer": None, "known": True, "ignored": False},
         {"data": data_id_by_name("Cannon", "builder"), "lvl": 1, "cnt": 1, "timer": None, "known": True, "ignored": False},
     ],
@@ -86,10 +87,13 @@ check("builder_base" in summary, "métricas expõem Base do Construtor separadam
 check(summary["builder_base"]["builder_hall_level"] == 6, "nível do Centro do Construtor é identificado")
 check("bb-defense" in summary["builder_base"]["categories"], "defesas da Base do Construtor não entram na Vila Principal")
 check(any(item["base"] == "builder" for item in summary["inventory"]), "inventário preserva a base de cada entidade")
+alchemist = next(item for item in summary["inventory"] if item["id"] == "alchemist")
+check(alchemist["helper"] is True and alchemist["name"] == "Alchemist",
+      "Alchemist é o quarto ajudante e não uma construção")
 
 plan = planner.plan(snapshot, summary, "balanced", now_ts=int(time.time()))
 home_names = {row["name"] for row in plan["builders"]["schedule"]}
-check("Builder's Apprentice" not in home_names and "Lab Assistant" not in home_names,
+check(not {"Builder's Apprentice", "Lab Assistant", "Alchemist"}.intersection(home_names),
       "ajudantes não ocupam fila de construtor")
 check("builder_base" in plan, "planejador devolve cronograma próprio da Base do Construtor")
 check(all(row.get("base") == "builder" for row in plan["builder_base"]["builders"]["schedule"]),
