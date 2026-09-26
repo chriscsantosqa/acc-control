@@ -5,20 +5,21 @@
   --faceoff-right-y: 0px;
 }
 
-html,
-body {
-  overflow-x: hidden;
-}
+html, body { overflow-x: hidden; }
 
-/* Decorative character scene shared by login and the authenticated SPA. */
+/* Global decorative scene: never participates in interaction or document flow. */
 .faceoff-scene {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   overflow: hidden;
-  pointer-events: none;
+  pointer-events: none !important;
   user-select: none;
-  isolation: isolate;
+}
+
+.faceoff-scene,
+.faceoff-scene * {
+  pointer-events: none !important;
 }
 
 .faceoff-scene::before {
@@ -27,9 +28,8 @@ body {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(circle at 22% 28%, rgba(73, 220, 255, .18), transparent 32%),
-    radial-gradient(circle at 80% 27%, rgba(174, 74, 255, .21), transparent 34%),
-    radial-gradient(circle at 50% 22%, rgba(68, 92, 180, .10), transparent 36%);
+    radial-gradient(circle at 19% 30%, rgba(73,220,255,.20), transparent 31%),
+    radial-gradient(circle at 82% 29%, rgba(174,74,255,.23), transparent 33%);
 }
 
 .faceoff-scene::after {
@@ -38,24 +38,21 @@ body {
   inset: 0;
   z-index: 3;
   background:
-    linear-gradient(180deg, rgba(5, 9, 21, .04) 0%, rgba(5, 9, 21, .16) 48%, rgba(5, 9, 21, .72) 100%),
-    radial-gradient(ellipse at center, transparent 0 24%, rgba(6, 10, 25, .12) 52%, rgba(6, 10, 25, .42) 100%);
+    linear-gradient(180deg, rgba(5,9,21,.02) 0%, rgba(5,9,21,.08) 48%, rgba(5,9,21,.62) 100%),
+    radial-gradient(ellipse at center, rgba(6,10,25,.32) 0 18%, rgba(6,10,25,.08) 44%, rgba(6,10,25,.30) 100%);
 }
 
 .faceoff-character {
   position: absolute;
-  top: 68px;
+  top: 64px;
   z-index: 1;
-  width: clamp(300px, 31vw, 610px);
-  height: calc(100vh - 68px);
+  width: clamp(340px, 34vw, 650px);
+  height: calc(100vh - 64px);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  opacity: .34;
-  filter:
-    saturate(1.08)
-    contrast(1.04)
-    drop-shadow(0 24px 55px rgba(0, 0, 0, .48));
+  opacity: .42;
+  filter: saturate(1.1) contrast(1.05) drop-shadow(0 24px 55px rgba(0,0,0,.48));
   will-change: transform;
   transition: opacity .25s ease, filter .25s ease;
 }
@@ -66,108 +63,92 @@ body {
   height: 100%;
   object-fit: contain;
   object-position: center top;
-  pointer-events: none;
-  user-select: none;
 }
 
-.faceoff-left {
-  left: clamp(240px, 15vw, 300px);
+/* Authenticated app has a 270px sidebar. Start the left character after it. */
+.faceoff-platform .faceoff-left {
+  left: clamp(255px, 17vw, 330px);
   transform: translate3d(var(--faceoff-left-x), var(--faceoff-left-y), 0);
 }
-
-.faceoff-right {
+.faceoff-platform .faceoff-right {
   right: -2vw;
   transform: translate3d(var(--faceoff-right-x), var(--faceoff-right-y), 0) scaleX(-1);
 }
 
-/* Login has no sidebar, so the composition can open wider and become more prominent. */
+/* Login has no sidebar and can use a wider, more visible face-to-face composition. */
 .faceoff-login .faceoff-character {
-  top: 72px;
-  width: clamp(360px, 34vw, 660px);
-  height: calc(100vh - 72px);
-  opacity: .48;
+  top: 66px;
+  width: clamp(420px, 38vw, 720px);
+  height: calc(100vh - 66px);
+  opacity: .66;
 }
-
 .faceoff-login .faceoff-left {
-  left: -1.5vw;
+  left: -3vw;
+  transform: translate3d(var(--faceoff-left-x), var(--faceoff-left-y), 0);
 }
-
 .faceoff-login .faceoff-right {
-  right: -1.5vw;
+  right: -3vw;
+  transform: translate3d(var(--faceoff-right-x), var(--faceoff-right-y), 0) scaleX(-1);
 }
-
 .faceoff-login::after {
   background:
-    radial-gradient(ellipse at center, rgba(7, 13, 30, .54) 0 20%, rgba(7, 13, 30, .28) 38%, rgba(7, 13, 30, .24) 58%, rgba(7, 13, 30, .58) 100%),
-    linear-gradient(180deg, rgba(4, 8, 18, .02), rgba(4, 8, 18, .42));
+    radial-gradient(ellipse at center, rgba(7,13,30,.58) 0 19%, rgba(7,13,30,.23) 37%, rgba(7,13,30,.16) 58%, rgba(7,13,30,.48) 100%),
+    linear-gradient(180deg, rgba(4,8,18,.01), rgba(4,8,18,.34));
 }
 
-/* All functional layers are guaranteed to stay above the artwork. */
-.shell,
-.side,
-.main,
-.top,
-#app,
-.box,
-.modal-bg,
-.modal,
-.login-card,
-.auth-shell {
+/* One stacking root is enough. Do not rewrite .side/.top/.modal positions. */
+.shell {
+  position: relative;
+  z-index: 4;
+}
+.login-page .box {
   position: relative;
   z-index: 4;
 }
 
-/* The sidebar remains readable and the faceoff starts inside the content area. */
-.side {
-  isolation: isolate;
+/* IMPORTANT: keep the modal overlay fixed. The previous faceoff CSS changed it
+   to relative and broke all modal interactions/layout. */
+.modal-bg {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1000 !important;
+}
+.modal-bg.open { display: flex !important; }
+.modal {
+  position: relative;
+  z-index: 1001;
 }
 
-/* Keep cards readable while still allowing the characters to be perceived as background art. */
-.main .hero,
-.main .section,
-.main .card,
-.main .top,
-.main .item,
-.main .unit {
-  backdrop-filter: blur(2px);
+/* Keep the artwork perceptible through the authenticated content without hurting readability. */
+.dashboard-page .main {
+  background: linear-gradient(180deg, rgba(5,8,20,.10), rgba(5,8,20,.28));
+}
+.dashboard-page .hero,
+.dashboard-page .section,
+.dashboard-page .card,
+.dashboard-page .top,
+.dashboard-page .item,
+.dashboard-page .unit {
+  backdrop-filter: blur(3px);
 }
 
 @media (max-width: 1380px) {
-  .faceoff-platform .faceoff-character {
-    width: clamp(280px, 29vw, 480px);
-    opacity: .27;
-  }
-
-  .faceoff-platform .faceoff-left {
-    left: 230px;
-  }
+  .faceoff-platform .faceoff-character { width: clamp(300px, 31vw, 520px); opacity: .34; }
+  .faceoff-platform .faceoff-left { left: 235px; }
 }
 
 @media (max-width: 1080px) {
-  .faceoff-platform .faceoff-character {
-    opacity: .18;
-    width: 360px;
-  }
-
-  .faceoff-platform .faceoff-left {
-    left: 210px;
-  }
-
-  .faceoff-login .faceoff-character {
-    opacity: .28;
-    width: 420px;
-  }
+  .faceoff-platform .faceoff-character { width: 380px; opacity: .24; }
+  .faceoff-platform .faceoff-left { left: 205px; }
+  .faceoff-login .faceoff-character { width: 440px; opacity: .38; }
 }
 
 @media (max-width: 780px) {
-  .faceoff-scene {
-    display: none;
-  }
+  .faceoff-scene { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .faceoff-character {
-    transition: none;
-    transform: none !important;
-  }
+  .faceoff-character { transition: none; }
+  .faceoff-left { transform: none !important; }
+  .faceoff-right { transform: scaleX(-1) !important; }
 }
